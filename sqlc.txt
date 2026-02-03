@@ -1,0 +1,8 @@
+1. viet model
+schema/postgres/products.sql
+schema/mysql/products.sql
+2. viet query
+queries/postgres/products.sql
+queries/mysql/products.sql
+3. generate
+make sqlc

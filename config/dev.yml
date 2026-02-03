@@ -1,0 +1,36 @@
+server:
+  port: 8080
+  mode: "dev"
+db_postgre:
+  host: localhost
+  port: 5432
+  user: gogin_user
+  password: 123456
+  dbname: gogin
+  maxIdleConns: 10
+  maxOpenConns: 100
+  connMaxLifetime: 3600
+db_mysql:
+  host: localhost
+  port: 3306
+  user: gogin_user
+  password: 123456
+  dbname: gogin
+  maxIdleConns: 10
+  maxOpenConns: 100
+  connMaxLifetime: 3600
+redis:
+  addr: localhost:6379
+  password: ""
+  db: 0
+  poolSize: 10
+logger:
+  log_level: debug
+  file_log: ./storage/logs/app.log
+  max_size: 500
+  max_backups: 3
+  max_age: 28
+  compress: true
+telegram:
+  bot_token: 8335198085:AAEEuPGcI-mB9fSOkEeuciKSCJHoeNmoXIw
+  chat_id: 6402448229

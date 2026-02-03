@@ -1,0 +1,62 @@
+# =========================
+# AIR CONFIGURATION
+# =========================
+
+# Root của project
+root = "."
+
+# Thư mục chứa binary build
+tmp_dir = "cmd/tmp"
+
+# =========================
+# BUILD CONFIG
+# =========================
+[build]
+  # Lệnh build (PHẢI trỏ vào cmd/tmp)
+  cmd = "go build -o cmd/tmp/app cmd/server/main.go"
+
+  # Binary được chạy
+  bin = "cmd/tmp/app"
+
+  # Thời gian delay sau khi detect file change (ms)
+  delay = 500
+
+  # Polling mode (khuyên dùng cho macOS / Docker)
+  poll = true
+  poll_interval = 500
+
+  # Thư mục KHÔNG trigger rebuild
+  exclude_dir = [
+    "cmd/tmp",
+    "vendor",
+    "docs",
+    "storage",
+    "migrations",
+    ".git"
+  ]
+
+  # Chỉ rebuild khi file có extension sau thay đổi
+  include_ext = [
+    "go",
+    "yaml",
+    "yml",
+    "env"
+  ]
+
+  # Gửi SIGINT để graceful shutdown
+  send_interrupt = true
+
+  # Đợi bao lâu trước khi kill process (ms)
+  kill_delay = 1000
+
+# =========================
+# LOG CONFIG
+# =========================
+[log]
+  time = true
+
+# =========================
+# MISC
+# =========================
+[misc]
+  clean_on_exit = true
