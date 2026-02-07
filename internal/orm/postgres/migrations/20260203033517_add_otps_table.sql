@@ -16,16 +16,17 @@ CREATE TABLE otps (
     attempt_count int DEFAULT 0,
     max_attempt int DEFAULT 5,
 
-    expires_at timestamp NOT NULL,
-    used_at timestamp NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    used_at TIMESTAMPTZ,
 
     status varchar(20) DEFAULT 'active',
     -- active | used | expired | locked
 
     metadata jsonb DEFAULT '{}'::jsonb,
 
-    created_at timestamp DEFAULT now(),
-    updated_at timestamp DEFAULT now()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMPTZ
 );
 
 CREATE INDEX idx_otp_target_purpose
@@ -33,10 +34,17 @@ ON otps (target, purpose);
 
 CREATE INDEX idx_otp_expires_at
 ON otps (expires_at);
+
+DROP TRIGGER IF EXISTS update_otps_updated_at ON otps;
+CREATE TRIGGER update_otps_updated_at
+BEFORE UPDATE ON otps
+FOR EACH ROW
+EXECUTE FUNCTION update_updated_at_column();
 -- +goose StatementEnd
 
 
 -- +goose Down
 -- +goose StatementBegin
+DROP TRIGGER IF EXISTS update_otps_updated_at ON otps;
 DROP TABLE IF EXISTS otps;
 -- +goose StatementEnd

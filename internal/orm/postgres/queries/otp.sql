@@ -58,3 +58,19 @@ SET status = 'expired',
     updated_at = now()
 WHERE expires_at < now()
   AND status = 'active';
+
+-- name: GetLastOTPCreatedAt :one
+SELECT created_at FROM otps
+WHERE target = $1 AND purpose = $2
+ORDER BY created_at DESC
+LIMIT 1;
+
+-- name: CountOTPsCreatedSince :one
+SELECT COUNT(*)::int FROM otps
+WHERE target = $1 AND purpose = $2 AND created_at >= $3;
+
+-- name: GetOldestOTPCreatedAtSince :one
+SELECT created_at FROM otps
+WHERE target = $1 AND purpose = $2 AND created_at >= $3
+ORDER BY created_at ASC
+LIMIT 1;

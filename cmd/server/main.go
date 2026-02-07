@@ -30,6 +30,15 @@ func main() {
 	global.Logger = logger.NewLoggerApplication(cfg.Logger)
 	zap.ReplaceGlobals(global.Logger.Logger)
 
+	// Logger theo channel (auth -> auth.log, http -> http.log, ...)
+	global.ChannelLoggers = make(map[string]*logger.LoggerZap)
+	for name, filePath := range cfg.Logger.Channels {
+		if name == "" || filePath == "" {
+			continue
+		}
+		global.ChannelLoggers[name] = logger.NewChannelLogger(cfg.Logger, name, filePath)
+	}
+
 	// 4. HTTP server
 	server := &http.Server{
 		Addr:    fmt.Sprintf(":%s", cfg.Server.Port),
@@ -38,7 +47,6 @@ func main() {
 
 	// 5. Run server
 	go func() {
-		zap.S().Infow("HTTP server started", "port", cfg.Server.Port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			zap.S().Panic("HTTP server failed", zap.Error(err))
 		}

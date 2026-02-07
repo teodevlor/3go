@@ -2,23 +2,23 @@ package usecase
 
 import (
 	"context"
-	"go-structure/internal/adapter"
+	telegramadapter "go-structure/internal/adapter"
 )
 
 type (
 	INotifyUsecase interface {
-		SendMessage(ctx context.Context, message string) error
+		SendOtp(ctx context.Context, message string) error
 	}
 
 	notifyUsecase struct {
-		notifyAdapter adapter.INotifyAdapter
+		notifyAdapter telegramadapter.INotifyAdapter
 	}
 )
 
-func NewNotifyUsecase(notifyAdapter adapter.INotifyAdapter) INotifyUsecase {
+func NewNotifyUsecase(notifyAdapter telegramadapter.INotifyAdapter) INotifyUsecase {
 	return &notifyUsecase{notifyAdapter: notifyAdapter}
 }
 
-func (u *notifyUsecase) SendMessage(ctx context.Context, message string) error {
-	return u.notifyAdapter.SendMessage(ctx, message)
+func (u *notifyUsecase) SendOtp(ctx context.Context, message string) error {
+	return u.notifyAdapter.SendOtp(ctx, message)
 }

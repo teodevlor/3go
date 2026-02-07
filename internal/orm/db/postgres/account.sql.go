@@ -30,7 +30,7 @@ INSERT INTO accounts (
     phone
 ) VALUES (
     $1, $2, $3
-) RETURNING id, email, phone, password_hash, created_at, updated_at
+) RETURNING id, email, phone, password_hash, created_at, updated_at, deleted_at
 `
 
 type CreateAccountParams struct {
@@ -49,6 +49,7 @@ func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (A
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -64,7 +65,7 @@ func (q *Queries) DeleteAccount(ctx context.Context, id uuid.UUID) error {
 }
 
 const getAccountByEmail = `-- name: GetAccountByEmail :one
-SELECT id, email, phone, password_hash, created_at, updated_at FROM accounts
+SELECT id, email, phone, password_hash, created_at, updated_at, deleted_at FROM accounts
 WHERE email = $1 LIMIT 1
 `
 
@@ -78,12 +79,13 @@ func (q *Queries) GetAccountByEmail(ctx context.Context, email pgtype.Text) (Acc
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getAccountByID = `-- name: GetAccountByID :one
-SELECT id, email, phone, password_hash, created_at, updated_at FROM accounts
+SELECT id, email, phone, password_hash, created_at, updated_at, deleted_at FROM accounts
 WHERE id = $1 LIMIT 1
 `
 
@@ -97,12 +99,13 @@ func (q *Queries) GetAccountByID(ctx context.Context, id uuid.UUID) (Account, er
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getAccountByPhone = `-- name: GetAccountByPhone :one
-SELECT id, email, phone, password_hash, created_at, updated_at FROM accounts
+SELECT id, email, phone, password_hash, created_at, updated_at, deleted_at FROM accounts
 WHERE phone = $1 LIMIT 1
 `
 
@@ -116,12 +119,13 @@ func (q *Queries) GetAccountByPhone(ctx context.Context, phone string) (Account,
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const listAccounts = `-- name: ListAccounts :many
-SELECT id, email, phone, password_hash, created_at, updated_at FROM accounts
+SELECT id, email, phone, password_hash, created_at, updated_at, deleted_at FROM accounts
 ORDER BY created_at DESC
 LIMIT $1 OFFSET $2
 `
@@ -147,6 +151,7 @@ func (q *Queries) ListAccounts(ctx context.Context, arg ListAccountsParams) ([]A
 			&i.PasswordHash,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -163,7 +168,7 @@ UPDATE accounts
 SET
     phone = COALESCE($1, phone)
 WHERE id = $2
-RETURNING id, email, phone, password_hash, created_at, updated_at
+RETURNING id, email, phone, password_hash, created_at, updated_at, deleted_at
 `
 
 type UpdateAccountParams struct {
@@ -181,6 +186,7 @@ func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) (A
 		&i.PasswordHash,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }

@@ -5,6 +5,8 @@
 package pgdb
 
 import (
+	"net/netip"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -16,30 +18,122 @@ type Account struct {
 	PasswordHash string             `json:"password_hash"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type AccountAppDevice struct {
+	ID         uuid.UUID          `json:"id"`
+	AccountID  uuid.UUID          `json:"account_id"`
+	DeviceID   uuid.UUID          `json:"device_id"`
+	AppType    string             `json:"app_type"`
+	FcmToken   pgtype.Text        `json:"fcm_token"`
+	IsActive   bool               `json:"is_active"`
+	LastUsedAt pgtype.Timestamptz `json:"last_used_at"`
+	Metadata   []byte             `json:"metadata"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type Device struct {
+	ID         uuid.UUID          `json:"id"`
+	DeviceUid  string             `json:"device_uid"`
+	Platform   string             `json:"platform"`
+	DeviceName pgtype.Text        `json:"device_name"`
+	OsVersion  pgtype.Text        `json:"os_version"`
+	AppVersion pgtype.Text        `json:"app_version"`
+	Metadata   []byte             `json:"metadata"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type LoginHistory struct {
+	ID            uuid.UUID          `json:"id"`
+	AccountID     uuid.UUID          `json:"account_id"`
+	DeviceID      uuid.UUID          `json:"device_id"`
+	AppType       string             `json:"app_type"`
+	LoginAt       pgtype.Timestamptz `json:"login_at"`
+	Result        string             `json:"result"`
+	FailureReason pgtype.Text        `json:"failure_reason"`
+	IpAddress     pgtype.Text        `json:"ip_address"`
+	UserAgent     pgtype.Text        `json:"user_agent"`
+	Location      pgtype.Text        `json:"location"`
+	Metadata      []byte             `json:"metadata"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }
 
 type Otp struct {
-	ID           uuid.UUID        `json:"id"`
-	Target       string           `json:"target"`
-	OtpCode      string           `json:"otp_code"`
-	Purpose      string           `json:"purpose"`
-	AttemptCount pgtype.Int4      `json:"attempt_count"`
-	MaxAttempt   pgtype.Int4      `json:"max_attempt"`
-	ExpiresAt    pgtype.Timestamp `json:"expires_at"`
-	UsedAt       pgtype.Timestamp `json:"used_at"`
-	Status       pgtype.Text      `json:"status"`
-	Metadata     []byte           `json:"metadata"`
-	CreatedAt    pgtype.Timestamp `json:"created_at"`
-	UpdatedAt    pgtype.Timestamp `json:"updated_at"`
+	ID           uuid.UUID          `json:"id"`
+	Target       string             `json:"target"`
+	OtpCode      string             `json:"otp_code"`
+	Purpose      string             `json:"purpose"`
+	AttemptCount pgtype.Int4        `json:"attempt_count"`
+	MaxAttempt   pgtype.Int4        `json:"max_attempt"`
+	ExpiresAt    pgtype.Timestamptz `json:"expires_at"`
+	UsedAt       pgtype.Timestamptz `json:"used_at"`
+	Status       pgtype.Text        `json:"status"`
+	Metadata     []byte             `json:"metadata"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type OtpAudit struct {
+	ID            uuid.UUID          `json:"id"`
+	OtpID         uuid.UUID          `json:"otp_id"`
+	Target        string             `json:"target"`
+	Purpose       string             `json:"purpose"`
+	AttemptNumber int32              `json:"attempt_number"`
+	Result        string             `json:"result"`
+	FailureReason pgtype.Text        `json:"failure_reason"`
+	IpAddress     *netip.Addr        `json:"ip_address"`
+	UserAgent     pgtype.Text        `json:"user_agent"`
+	Metadata      []byte             `json:"metadata"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type Session struct {
+	ID                 uuid.UUID          `json:"id"`
+	AccountAppDeviceID uuid.UUID          `json:"account_app_device_id"`
+	RefreshTokenHash   string             `json:"refresh_token_hash"`
+	ExpiresAt          pgtype.Timestamptz `json:"expires_at"`
+	IsRevoked          bool               `json:"is_revoked"`
+	RevokedAt          pgtype.Timestamptz `json:"revoked_at"`
+	RevokedReason      pgtype.Text        `json:"revoked_reason"`
+	LastActiveAt       pgtype.Timestamptz `json:"last_active_at"`
+	IpAddress          pgtype.Text        `json:"ip_address"`
+	UserAgent          pgtype.Text        `json:"user_agent"`
+	Metadata           []byte             `json:"metadata"`
+	CreatedAt          pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt          pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt          pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type Setting struct {
+	ID          uuid.UUID          `json:"id"`
+	AccountID   uuid.UUID          `json:"account_id"`
+	Key         string             `json:"key"`
+	Value       []byte             `json:"value"`
+	Type        interface{}        `json:"type"`
+	Description pgtype.Text        `json:"description"`
+	IsActive    pgtype.Bool        `json:"is_active"`
+	Metadata    []byte             `json:"metadata"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type UserProfile struct {
-	ID        uuid.UUID        `json:"id"`
-	AccountID uuid.UUID        `json:"account_id"`
-	FullName  string           `json:"full_name"`
-	AvatarUrl pgtype.Text      `json:"avatar_url"`
-	IsActive  pgtype.Bool      `json:"is_active"`
-	Metadata  []byte           `json:"metadata"`
-	CreatedAt pgtype.Timestamp `json:"created_at"`
-	UpdatedAt pgtype.Timestamp `json:"updated_at"`
+	ID        uuid.UUID          `json:"id"`
+	AccountID uuid.UUID          `json:"account_id"`
+	FullName  string             `json:"full_name"`
+	AvatarUrl pgtype.Text        `json:"avatar_url"`
+	IsActive  pgtype.Bool        `json:"is_active"`
+	Metadata  []byte             `json:"metadata"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
 }

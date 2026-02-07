@@ -9,4 +9,5 @@ type Account struct {
 	Email        string    `json:"email"`
 	Phone        string    `json:"phone"`
 	PasswordHash string    `json:"password_hash"`
+	BaseModel
 }

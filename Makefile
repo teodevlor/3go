@@ -1,5 +1,6 @@
 run:
 	go run cmd/server/main.go
+
 dev:
 	air
 
@@ -26,26 +27,39 @@ sqlc-clean:
 # DATABASE CONNECTIONS
 # ======================
 
-POSTGRES_DSN=postgres://gogin_user:123456@localhost:5432/gogin?sslmode=disable
-MYSQL_DSN=gogin_user:123456@tcp(localhost:3306)/gogin?parseTime=true
+APP_ENV ?= local
+
+POSTGRES_DSN_LOCAL  = postgres://postgres:postgres@localhost:5433/gogogo?sslmode=disable
+POSTGRES_DSN_DOCKER = postgres://postgres:postgres@localhost:5433/gogogo?sslmode=disable
+
+MYSQL_DSN_LOCAL  = gogin_user:123456@tcp(localhost:3306)/gogin?parseTime=true
+MYSQL_DSN_DOCKER = gogin_user:123456@tcp(mysql:3306)/gogin?parseTime=true
+
+ifeq ($(APP_ENV),docker)
+	POSTGRES_DSN = $(POSTGRES_DSN_DOCKER)
+	MYSQL_DSN    = $(MYSQL_DSN_DOCKER)
+else
+	POSTGRES_DSN = $(POSTGRES_DSN_LOCAL)
+	MYSQL_DSN    = $(MYSQL_DSN_LOCAL)
+endif
 
 # ======================
 # GOOSE DIRECTORIES
 # ======================
 
 PG_MIGRATION_DIR=internal/orm/postgres/migrations
+PG_SEED_DIR=internal/orm/postgres/migrations/seeds
 MYSQL_MIGRATION_DIR=internal/orm/mysql/migrations
 
 # ======================
 # POSTGRES MIGRATIONS
 # ======================
 
-# make pg-new name=add_users_table
 pg-new:
 	@goose -dir $(PG_MIGRATION_DIR) create $(name) sql
 
 pg-up:
-	@goose -dir $(PG_MIGRATION_DIR) postgres "$(POSTGRES_DSN)" up
+	@goose -dir $(PG_MIGRATION_DIR) postgres "$(POSTGRES_DSN)" up -allow-missing
 
 pg-down:
 	@goose -dir $(PG_MIGRATION_DIR) postgres "$(POSTGRES_DSN)" down
@@ -55,6 +69,24 @@ pg-reset:
 
 pg-status:
 	@goose -dir $(PG_MIGRATION_DIR) postgres "$(POSTGRES_DSN)" status
+
+# ======================
+# POSTGRES SEEDS
+# ======================
+
+pg-seed-up:
+	@goose -dir $(PG_SEED_DIR) postgres "$(POSTGRES_DSN)" up
+
+pg-seed-down:
+	@goose -dir $(PG_SEED_DIR) postgres "$(POSTGRES_DSN)" down
+
+pg-seed-status:
+	@goose -dir $(PG_SEED_DIR) postgres "$(POSTGRES_DSN)" status
+
+pg-seed-new:
+	@goose -dir $(PG_SEED_DIR) create $(name) sql
+
+pg-seed: pg-seed-up
 
 # ======================
 # MYSQL MIGRATIONS
@@ -75,3 +107,13 @@ mysql-reset:
 mysql-status:
 	@goose -dir $(MYSQL_MIGRATION_DIR) mysql "$(MYSQL_DSN)" status
 
+# ======================
+# DOCKER
+# ======================
+
+run-docker:
+	chmod +x scripts/start_docker.sh
+	./scripts/start_docker.sh
+
+run-goose-up-docker:
+	APP_ENV=docker make pg-up 

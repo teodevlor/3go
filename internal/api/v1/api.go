@@ -1,6 +1,7 @@
 package v1
 
 import (
+	otpcontroller "go-structure/internal/controller"
 	controller "go-structure/internal/controller/app_user"
 	"net/http"
 
@@ -10,6 +11,7 @@ import (
 func NewApiV1(
 	router *gin.Engine,
 	userProfileController controller.UserProfileController,
+	otpController otpcontroller.OTPController,
 ) {
 	apiV1 := router.Group("api/v1")
 	{
@@ -19,5 +21,6 @@ func NewApiV1(
 
 		// modules
 		NewUserProfileApi(userProfileController).InitUserProfileApi(apiV1, userProfileController)
+		NewOTPApi(otpController).InitOTPApI(apiV1, otpController)
 	}
 }

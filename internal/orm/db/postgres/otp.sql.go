@@ -12,6 +12,24 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countOTPsCreatedSince = `-- name: CountOTPsCreatedSince :one
+SELECT COUNT(*)::int FROM otps
+WHERE target = $1 AND purpose = $2 AND created_at >= $3
+`
+
+type CountOTPsCreatedSinceParams struct {
+	Target    string             `json:"target"`
+	Purpose   string             `json:"purpose"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) CountOTPsCreatedSince(ctx context.Context, arg CountOTPsCreatedSinceParams) (int32, error) {
+	row := q.db.QueryRow(ctx, countOTPsCreatedSince, arg.Target, arg.Purpose, arg.CreatedAt)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const createOTP = `-- name: CreateOTP :one
 INSERT INTO otps (
     target,
@@ -21,15 +39,15 @@ INSERT INTO otps (
     expires_at
 ) VALUES (
     $1, $2, $3, $4, $5
-) RETURNING id, target, otp_code, purpose, attempt_count, max_attempt, expires_at, used_at, status, metadata, created_at, updated_at
+) RETURNING id, target, otp_code, purpose, attempt_count, max_attempt, expires_at, used_at, status, metadata, created_at, updated_at, deleted_at
 `
 
 type CreateOTPParams struct {
-	Target     string           `json:"target"`
-	OtpCode    string           `json:"otp_code"`
-	Purpose    string           `json:"purpose"`
-	MaxAttempt pgtype.Int4      `json:"max_attempt"`
-	ExpiresAt  pgtype.Timestamp `json:"expires_at"`
+	Target     string             `json:"target"`
+	OtpCode    string             `json:"otp_code"`
+	Purpose    string             `json:"purpose"`
+	MaxAttempt pgtype.Int4        `json:"max_attempt"`
+	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
 }
 
 func (q *Queries) CreateOTP(ctx context.Context, arg CreateOTPParams) (Otp, error) {
@@ -54,6 +72,7 @@ func (q *Queries) CreateOTP(ctx context.Context, arg CreateOTPParams) (Otp, erro
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -72,7 +91,7 @@ func (q *Queries) ExpireOldOTPs(ctx context.Context) error {
 }
 
 const getActiveOTP = `-- name: GetActiveOTP :one
-SELECT id, target, otp_code, purpose, attempt_count, max_attempt, expires_at, used_at, status, metadata, created_at, updated_at FROM otps
+SELECT id, target, otp_code, purpose, attempt_count, max_attempt, expires_at, used_at, status, metadata, created_at, updated_at, deleted_at FROM otps
 WHERE target = $1 
   AND purpose = $2 
   AND status = 'active'
@@ -102,8 +121,48 @@ func (q *Queries) GetActiveOTP(ctx context.Context, arg GetActiveOTPParams) (Otp
 		&i.Metadata,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
+}
+
+const getLastOTPCreatedAt = `-- name: GetLastOTPCreatedAt :one
+SELECT created_at FROM otps
+WHERE target = $1 AND purpose = $2
+ORDER BY created_at DESC
+LIMIT 1
+`
+
+type GetLastOTPCreatedAtParams struct {
+	Target  string `json:"target"`
+	Purpose string `json:"purpose"`
+}
+
+func (q *Queries) GetLastOTPCreatedAt(ctx context.Context, arg GetLastOTPCreatedAtParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, getLastOTPCreatedAt, arg.Target, arg.Purpose)
+	var created_at pgtype.Timestamptz
+	err := row.Scan(&created_at)
+	return created_at, err
+}
+
+const getOldestOTPCreatedAtSince = `-- name: GetOldestOTPCreatedAtSince :one
+SELECT created_at FROM otps
+WHERE target = $1 AND purpose = $2 AND created_at >= $3
+ORDER BY created_at ASC
+LIMIT 1
+`
+
+type GetOldestOTPCreatedAtSinceParams struct {
+	Target    string             `json:"target"`
+	Purpose   string             `json:"purpose"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+}
+
+func (q *Queries) GetOldestOTPCreatedAtSince(ctx context.Context, arg GetOldestOTPCreatedAtSinceParams) (pgtype.Timestamptz, error) {
+	row := q.db.QueryRow(ctx, getOldestOTPCreatedAtSince, arg.Target, arg.Purpose, arg.CreatedAt)
+	var created_at pgtype.Timestamptz
+	err := row.Scan(&created_at)
+	return created_at, err
 }
 
 const incrementOTPAttempt = `-- name: IncrementOTPAttempt :exec

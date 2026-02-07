@@ -14,6 +14,7 @@ type (
 		Redis           Redis           `mapstructure:"redis"`
 		Logger          Logger          `mapstructure:"logger"`
 		TelegramConfig  TelegramConfig  `mapstructure:"telegram"`
+		JwtConfig       JwtConfig       `mapstructure:"jwt"`
 	}
 
 	Server struct {
@@ -59,17 +60,23 @@ type (
 	}
 
 	Logger struct {
-		LogLevel   string `mapstructure:"log_level"`
-		FileLog    string `mapstructure:"file_log"`
-		MaxSize    int    `mapstructure:"max_size"`
-		MaxBackups int    `mapstructure:"max_backups"`
-		MaxAge     int    `mapstructure:"max_age"`
-		Compress   bool   `mapstructure:"compress"`
+		LogLevel   string            `mapstructure:"log_level"`
+		FileLog    string            `mapstructure:"file_log"`
+		MaxSize    int               `mapstructure:"max_size"`
+		MaxBackups int               `mapstructure:"max_backups"`
+		MaxAge     int               `mapstructure:"max_age"`
+		Compress   bool              `mapstructure:"compress"`
+		Channels   map[string]string `mapstructure:"channels"`
 	}
 
 	TelegramConfig struct {
 		BotToken string `mapstructure:"bot_token"`
 		ChatID   int64  `mapstructure:"chat_id"`
+	}
+
+	JwtConfig struct {
+		Secret         string `mapstructure:"secret"`
+		AccessTokenTtl string `mapstructure:"access_token_ttl"`
 	}
 )
 

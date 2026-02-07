@@ -11,6 +11,5 @@ type UserProfile struct {
 	AvatarURL string
 	IsActive  bool
 	Metadata  []byte
-	CreatedAt string
-	UpdatedAt string
+	BaseModel
 }

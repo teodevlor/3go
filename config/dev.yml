@@ -2,11 +2,11 @@ server:
   port: 8080
   mode: "dev"
 db_postgre:
-  host: localhost
+  host: postgres
   port: 5432
-  user: gogin_user
-  password: 123456
-  dbname: gogin
+  user: postgres
+  password: postgres
+  dbname: gogogo
   maxIdleConns: 10
   maxOpenConns: 100
   connMaxLifetime: 3600
@@ -31,6 +31,12 @@ logger:
   max_backups: 3
   max_age: 28
   compress: true
+  channels:
+    auth: ./storage/logs/auth.log
+    http: ./storage/logs/http.log
 telegram:
   bot_token: 8335198085:AAEEuPGcI-mB9fSOkEeuciKSCJHoeNmoXIw
   chat_id: 6402448229
+jwt:
+  secret: dev-secret-key
+  access_token_ttl: 15m

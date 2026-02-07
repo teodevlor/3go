@@ -8,7 +8,7 @@ import (
 
 type (
 	INotifyAdapter interface {
-		SendMessage(ctx context.Context, message string) error
+		SendOtp(ctx context.Context, message string) error
 	}
 
 	notifyAdapter struct {
@@ -20,6 +20,6 @@ func NewTelegramAdapter(telegramClient *telegram.Client) INotifyAdapter {
 	return &notifyAdapter{telegramClient: telegramClient}
 }
 
-func (a *notifyAdapter) SendMessage(ctx context.Context, message string) error {
+func (a *notifyAdapter) SendOtp(ctx context.Context, message string) error {
 	return a.telegramClient.SendMessage(ctx, message)
 }

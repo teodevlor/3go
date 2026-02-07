@@ -14,21 +14,7 @@ type LoggerZap struct {
 }
 
 func NewLoggerApplication(config config.Logger) *LoggerZap {
-	logLevel := config.LogLevel
-	var level zapcore.Level
-
-	switch logLevel {
-	case "debug":
-		level = zapcore.DebugLevel
-	case "info":
-		level = zapcore.InfoLevel
-	case "warn":
-		level = zapcore.WarnLevel
-	case "error":
-		level = zapcore.ErrorLevel
-	default:
-		level = zapcore.InfoLevel
-	}
+	level := parseLogLevel(config.LogLevel)
 	encoder := getEncoderLog()
 	hook := lumberjack.Logger{
 		Filename:   config.FileLog,
@@ -38,18 +24,51 @@ func NewLoggerApplication(config config.Logger) *LoggerZap {
 		Compress:   config.Compress,
 	}
 
-	core := zapcore.NewCore(
-		encoder,
-		zapcore.NewMultiWriteSyncer(zapcore.AddSync(os.Stdout), zapcore.AddSync(&hook)),
-		level,
+	writeSyncer := zapcore.NewMultiWriteSyncer(
+		zapcore.AddSync(os.Stdout),
+		zapcore.AddSync(&hook),
 	)
+	core := zapcore.NewCore(encoder, writeSyncer, level)
 
 	return &LoggerZap{zap.New(core, zap.AddCaller(), zap.AddStacktrace(zap.ErrorLevel))}
 }
 
-// format log
+func NewChannelLogger(config config.Logger, channelName string, filePath string) *LoggerZap {
+	level := parseLogLevel(config.LogLevel)
+	encoder := getEncoderLog()
+	hook := lumberjack.Logger{
+		Filename:   filePath,
+		MaxSize:    config.MaxSize,
+		MaxBackups: config.MaxBackups,
+		MaxAge:     config.MaxAge,
+		Compress:   config.Compress,
+	}
+	writeSyncer := zapcore.NewMultiWriteSyncer(
+		zapcore.AddSync(os.Stdout),
+		zapcore.AddSync(&hook),
+	)
+	core := zapcore.NewCore(encoder, writeSyncer, level)
+	log := zap.New(core, zap.AddCaller(), zap.AddStacktrace(zap.ErrorLevel), zap.Fields(zap.String("channel", channelName)))
+	return &LoggerZap{log}
+}
+
+func parseLogLevel(logLevel string) zapcore.Level {
+	switch logLevel {
+	case "debug":
+		return zapcore.DebugLevel
+	case "info":
+		return zapcore.InfoLevel
+	case "warn":
+		return zapcore.WarnLevel
+	case "error":
+		return zapcore.ErrorLevel
+	default:
+		return zapcore.InfoLevel
+	}
+}
+
 func getEncoderLog() zapcore.Encoder {
-	encoderConfig := zap.NewProductionEncoderConfig() // config json
+	encoderConfig := zap.NewProductionEncoderConfig()
 
 	// format time
 	encoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder

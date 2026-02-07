@@ -7,7 +7,9 @@ import (
 
 	"go-structure/config"
 	v1 "go-structure/internal/api/v1"
+	otpcontroller "go-structure/internal/controller"
 	controller "go-structure/internal/controller/app_user"
+	"go-structure/internal/helper/database"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -91,26 +93,6 @@ func buildConfigs() error {
 }
 
 func buildDatabase() error {
-	// postgresDef := di.Def{
-	// 	Name:  DatabasePostgresDIName,
-	// 	Scope: di.App,
-	// 	Build: func(ctn di.Container) (interface{}, error) {
-	// 		cfg := ctn.Get(ConfigDIName).(*config.Config)
-	// 		return NewDB(DriverPostgres, cfg)
-	// 	},
-	// 	Close: func(obj interface{}) error { return obj.(database.DBHelper).Close() },
-	// }
-
-	// mysqlDef := di.Def{
-	// 	Name:  DatabaseMySQLDIName,
-	// 	Scope: di.App,
-	// 	Build: func(ctn di.Container) (interface{}, error) {
-	// 		cfg := ctn.Get(ConfigDIName).(*config.Config)
-	// 		return NewDB(DriverMySQL, cfg)
-	// 	},
-	// 	Close: func(obj interface{}) error { return obj.(database.DBHelper).Close() },
-	// }
-
 	// Pool Postgres for SQLC (ORM - SQLC)
 	pgPoolDef := di.Def{
 		Name:  PostgresPoolDIName,
@@ -144,7 +126,17 @@ func buildDatabase() error {
 		},
 	}
 
-	return builder.Add(pgPoolDef)
+	// Transaction Manager for managing transactions
+	txManagerDef := di.Def{
+		Name:  TransactionManagerDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			pool := ctn.Get(PostgresPoolDIName).(*pgxpool.Pool)
+			return database.NewTransactionManager(pool), nil
+		},
+	}
+
+	return builder.Add(pgPoolDef, txManagerDef)
 }
 
 func buildApis() error {
@@ -154,9 +146,11 @@ func buildApis() error {
 		Name:  ApiDIName,
 		Scope: di.App,
 		Build: func(ctn di.Container) (interface{}, error) {
-			router := gin.New()
+			router := gin.Default()
+			// router := gin.New()
 			userProfileController := ctn.Get(UserProfileControllerDIName).(controller.UserProfileController)
-			v1.NewApiV1(router, userProfileController)
+			otpController := ctn.Get(OTPControllerDIName).(otpcontroller.OTPController)
+			v1.NewApiV1(router, userProfileController, otpController)
 			return router, nil
 		},
 	}

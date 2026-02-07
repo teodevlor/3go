@@ -33,16 +33,42 @@ func (u *userProfileApi) InitUserProfileApi(router *gin.RouterGroup, userProfile
 			resp := userProfileController.RegisterUserProfile(c)
 			c.JSON(http.StatusOK, resp)
 		})
+		userRoutesPublic.POST("login", func(c *gin.Context) {
+			resp := userProfileController.LoginUserProfile(c)
+			c.JSON(http.StatusOK, resp)
+		})
+		userRoutesPublic.POST("active", func(c *gin.Context) {
+			resp := userProfileController.ActiveUserProfile(c)
+			c.JSON(http.StatusOK, resp)
+		})
+		userRoutesPublic.POST("refresh-token", func(c *gin.Context) {
+			resp := userProfileController.RefreshToken(c)
+			c.JSON(http.StatusOK, resp)
+		})
+		userRoutesPublic.POST("forgot-password", func(c *gin.Context) {
+			resp := userProfileController.ForgotPassword(c)
+			c.JSON(http.StatusOK, resp)
+		})
+		userRoutesPublic.POST("reset-password", func(c *gin.Context) {
+			resp := userProfileController.ResetPassword(c)
+			c.JSON(http.StatusOK, resp)
+		})
 	}
 
 	userRoutesPrivate := router.Group(API_MODULE_USER)
 	userRoutesPrivate.Use(middlewares.AuthMiddleware())
 	{
-		userRoutesPrivate.GET("me", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{
-				"message": "user info (authenticated)",
-				"user":    c.MustGet("userId"),
-			})
+		userRoutesPrivate.GET("profile", func(c *gin.Context) {
+			resp := userProfileController.GetUserProfile(c)
+			c.JSON(http.StatusOK, resp)
+		})
+		userRoutesPrivate.PUT("update-user-profile", func(c *gin.Context) {
+			resp := userProfileController.UpdateUserProfile(c)
+			c.JSON(http.StatusOK, resp)
+		})
+		userRoutesPrivate.POST("logout", func(c *gin.Context) {
+			resp := userProfileController.Logout(c)
+			c.JSON(http.StatusOK, resp)
 		})
 	}
 }

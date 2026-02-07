@@ -7,6 +7,7 @@ const (
 	StatusNoContent           = 204
 	StatusBadRequest          = 400
 	StatusUnprocessableEntity = 422
+	StatusTooManyRequests     = 429
 	StatusUnauthorized        = 401
 	StatusForbidden           = 403
 	StatusNotFound            = 404
@@ -23,6 +24,7 @@ var httpMessage = map[int]string{
 	StatusNoContent:           "No Content",
 	StatusBadRequest:          "Bad Request",
 	StatusUnprocessableEntity: "Unprocessable Entity",
+	StatusTooManyRequests:     "Too Many Requests",
 	StatusUnauthorized:        "Unauthorized",
 	StatusForbidden:           "Forbidden",
 	StatusNotFound:            "Not Found",

@@ -1,0 +1,2 @@
+{"level":"INFO","timestamp":"2026-02-06T09:29:23.534+0700","file":"app_user/user_profile.usecase.go:238","message":"ensureDevice","channel":"auth","device":"9c1b6f3e-2d44-4c1b-9f7a-8a6c2e4f5d91"}
+{"level":"INFO","timestamp":"2026-02-06T19:32:32.438+0700","file":"app_user/user_profile.usecase.go:238","message":"ensureDevice","channel":"auth","device":"9c1b6f3e-2d44-4c1b-9f7a-8a6c2e4f5d91"}
