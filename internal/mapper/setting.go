@@ -5,18 +5,13 @@ import (
 	"go-structure/internal/repository/model"
 )
 
-func ToSetting(row pgdb.Setting) *model.Setting {
-	settingType := ""
-	if t, ok := row.Type.(string); ok {
-		settingType = t
-	}
-
+func ToSetting(row pgdb.SystemSetting) *model.Setting {
 	return &model.Setting{
 		ID:          row.ID,
 		AccountID:   row.AccountID,
 		Key:         row.Key,
 		Value:       row.Value,
-		Type:        settingType,
+		Type:        row.Type,
 		Description: row.Description.String,
 		IsActive:    row.IsActive.Bool,
 		Metadata:    row.Metadata,

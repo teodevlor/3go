@@ -11,14 +11,14 @@ import (
 
 const getSettingByKey = `-- name: GetSettingByKey :one
 SELECT id, account_id, key, value, type, description, is_active, metadata, created_at, updated_at, deleted_at
-FROM settings
+FROM system_settings
 WHERE key = $1 AND is_active = true
 LIMIT 1
 `
 
-func (q *Queries) GetSettingByKey(ctx context.Context, key string) (Setting, error) {
+func (q *Queries) GetSettingByKey(ctx context.Context, key string) (SystemSetting, error) {
 	row := q.db.QueryRow(ctx, getSettingByKey, key)
-	var i Setting
+	var i SystemSetting
 	err := row.Scan(
 		&i.ID,
 		&i.AccountID,

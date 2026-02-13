@@ -29,13 +29,17 @@ sqlc-clean:
 
 APP_ENV ?= local
 
-POSTGRES_DSN_LOCAL  = postgres://postgres:postgres@localhost:5433/gogogo?sslmode=disable
+POSTGRES_DSN_LOCAL  = postgres://gogin_user:123456@localhost:5432/gogin?sslmode=disable
 POSTGRES_DSN_DOCKER = postgres://postgres:postgres@localhost:5433/gogogo?sslmode=disable
 
 MYSQL_DSN_LOCAL  = gogin_user:123456@tcp(localhost:3306)/gogin?parseTime=true
 MYSQL_DSN_DOCKER = gogin_user:123456@tcp(mysql:3306)/gogin?parseTime=true
 
+# Dùng DSN Docker khi chạy trong môi trường docker hoặc docker_dev
 ifeq ($(APP_ENV),docker)
+	POSTGRES_DSN = $(POSTGRES_DSN_DOCKER)
+	MYSQL_DSN    = $(MYSQL_DSN_DOCKER)
+else ifeq ($(APP_ENV),docker_dev)
 	POSTGRES_DSN = $(POSTGRES_DSN_DOCKER)
 	MYSQL_DSN    = $(MYSQL_DSN_DOCKER)
 else
@@ -73,9 +77,11 @@ pg-status:
 # ======================
 # POSTGRES SEEDS
 # ======================
+# Mặc định pg-seed-up dùng POSTGRES_DSN_LOCAL (localhost:5432, gogin).
+# Để seed vào DB Docker (localhost:5433, gogogo): make pg-seed-up-docker
 
 pg-seed-up:
-	@goose -dir $(PG_SEED_DIR) postgres "$(POSTGRES_DSN)" up
+	@goose -dir $(PG_SEED_DIR) postgres "$(POSTGRES_DSN)" up -allow-missing
 
 pg-seed-down:
 	@goose -dir $(PG_SEED_DIR) postgres "$(POSTGRES_DSN)" down
@@ -87,6 +93,12 @@ pg-seed-new:
 	@goose -dir $(PG_SEED_DIR) create $(name) sql
 
 pg-seed: pg-seed-up
+
+pg-seed-up-docker:
+	APP_ENV=docker_dev $(MAKE) pg-seed-up
+
+pg-seed-down-docker:
+	APP_ENV=docker_dev $(MAKE) pg-seed-down
 
 # ======================
 # MYSQL MIGRATIONS
@@ -117,3 +129,9 @@ run-docker:
 
 run-goose-up-docker:
 	APP_ENV=docker make pg-up 
+
+run-docker-dev:
+	docker compose -f docker/docker-compose.dev.yml up -d --build
+
+run-goose-up-docker-dev:
+	APP_ENV=docker_dev make pg-up

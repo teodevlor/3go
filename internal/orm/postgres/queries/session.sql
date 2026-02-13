@@ -1,5 +1,5 @@
 -- name: CreateSession :one
-INSERT INTO sessions (
+INSERT INTO system_sessions (
     account_app_device_id,
     refresh_token_hash,
     expires_at,
@@ -11,18 +11,18 @@ INSERT INTO sessions (
 ) RETURNING *;
 
 -- name: GetSessionByID :one
-SELECT * FROM sessions
+SELECT * FROM system_sessions
 WHERE id = $1 AND deleted_at IS NULL;
 
 -- name: GetSessionByRefreshTokenHash :one
-SELECT * FROM sessions
+SELECT * FROM system_sessions
 WHERE refresh_token_hash = $1
   AND is_revoked = false
   AND deleted_at IS NULL;
 
 -- name: ListActiveSessions :many
 SELECT s.*, aad.account_id, aad.device_id, aad.app_type
-FROM sessions s
+FROM system_sessions s
 JOIN account_app_devices aad ON s.account_app_device_id = aad.id
 WHERE aad.account_id = $1
   AND s.is_revoked = false
@@ -31,12 +31,12 @@ WHERE aad.account_id = $1
 ORDER BY s.last_active_at DESC;
 
 -- name: UpdateSessionActivity :exec
-UPDATE sessions
+UPDATE system_sessions
 SET last_active_at = CURRENT_TIMESTAMP
 WHERE id = $1;
 
 -- name: RevokeSession :exec
-UPDATE sessions
+UPDATE system_sessions
 SET
     is_revoked = true,
     revoked_at = CURRENT_TIMESTAMP,
@@ -44,7 +44,7 @@ SET
 WHERE id = $1;
 
 -- name: RevokeSessionByRefreshToken :exec
-UPDATE sessions
+UPDATE system_sessions
 SET
     is_revoked = true,
     revoked_at = CURRENT_TIMESTAMP,
@@ -52,7 +52,7 @@ SET
 WHERE refresh_token_hash = $1;
 
 -- name: RevokeAllSessionsByAccount :exec
-UPDATE sessions
+UPDATE system_sessions
 SET
     is_revoked = true,
     revoked_at = CURRENT_TIMESTAMP,
@@ -62,7 +62,7 @@ WHERE account_app_device_id IN (
 );
 
 -- name: RevokeAllSessionsByAccountAppDevice :exec
-UPDATE sessions
+UPDATE system_sessions
 SET
     is_revoked = true,
     revoked_at = CURRENT_TIMESTAMP,
@@ -70,7 +70,7 @@ SET
 WHERE account_app_device_id = $1;
 
 -- name: DeleteExpiredSessions :exec
-UPDATE sessions
+UPDATE system_sessions
 SET deleted_at = CURRENT_TIMESTAMP
 WHERE expires_at < CURRENT_TIMESTAMP
   AND deleted_at IS NULL;

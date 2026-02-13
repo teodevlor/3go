@@ -35,20 +35,7 @@ type AccountAppDevice struct {
 	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
 }
 
-type Device struct {
-	ID         uuid.UUID          `json:"id"`
-	DeviceUid  string             `json:"device_uid"`
-	Platform   string             `json:"platform"`
-	DeviceName pgtype.Text        `json:"device_name"`
-	OsVersion  pgtype.Text        `json:"os_version"`
-	AppVersion pgtype.Text        `json:"app_version"`
-	Metadata   []byte             `json:"metadata"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
-}
-
-type LoginHistory struct {
+type AppLoginHistory struct {
 	ID            uuid.UUID          `json:"id"`
 	AccountID     uuid.UUID          `json:"account_id"`
 	DeviceID      uuid.UUID          `json:"device_id"`
@@ -63,7 +50,74 @@ type LoginHistory struct {
 	CreatedAt     pgtype.Timestamptz `json:"created_at"`
 }
 
-type Otp struct {
+type Device struct {
+	ID         uuid.UUID          `json:"id"`
+	DeviceUid  string             `json:"device_uid"`
+	Platform   string             `json:"platform"`
+	DeviceName pgtype.Text        `json:"device_name"`
+	OsVersion  pgtype.Text        `json:"os_version"`
+	AppVersion pgtype.Text        `json:"app_version"`
+	Metadata   []byte             `json:"metadata"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type SystemAdmin struct {
+	ID           uuid.UUID          `json:"id"`
+	Email        string             `json:"email"`
+	PasswordHash string             `json:"password_hash"`
+	FullName     pgtype.Text        `json:"full_name"`
+	Department   string             `json:"department"`
+	IsActive     pgtype.Bool        `json:"is_active"`
+	LastLoginAt  pgtype.Timestamptz `json:"last_login_at"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+}
+
+type SystemAdminRefreshToken struct {
+	ID               uuid.UUID          `json:"id"`
+	AdminID          uuid.UUID          `json:"admin_id"`
+	RefreshTokenHash string             `json:"refresh_token_hash"`
+	ExpiresAt        pgtype.Timestamptz `json:"expires_at"`
+	IsRevoked        bool               `json:"is_revoked"`
+	RevokedAt        pgtype.Timestamptz `json:"revoked_at"`
+	RevokedReason    pgtype.Text        `json:"revoked_reason"`
+	LastActiveAt     pgtype.Timestamptz `json:"last_active_at"`
+	IpAddress        pgtype.Text        `json:"ip_address"`
+	UserAgent        pgtype.Text        `json:"user_agent"`
+	Metadata         []byte             `json:"metadata"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type SystemDistancePricingRule struct {
+	ID         uuid.UUID          `json:"id"`
+	ServiceID  uuid.UUID          `json:"service_id"`
+	FromKm     pgtype.Numeric     `json:"from_km"`
+	ToKm       pgtype.Numeric     `json:"to_km"`
+	PricePerKm pgtype.Numeric     `json:"price_per_km"`
+	IsActive   bool               `json:"is_active"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type SystemLoginHistory struct {
+	ID            uuid.UUID          `json:"id"`
+	AdminID       uuid.UUID          `json:"admin_id"`
+	LoginAt       pgtype.Timestamptz `json:"login_at"`
+	Result        string             `json:"result"`
+	FailureReason pgtype.Text        `json:"failure_reason"`
+	IpAddress     pgtype.Text        `json:"ip_address"`
+	UserAgent     pgtype.Text        `json:"user_agent"`
+	Location      pgtype.Text        `json:"location"`
+	Metadata      []byte             `json:"metadata"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+}
+
+type SystemOtp struct {
 	ID           uuid.UUID          `json:"id"`
 	Target       string             `json:"target"`
 	OtpCode      string             `json:"otp_code"`
@@ -79,7 +133,7 @@ type Otp struct {
 	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
 }
 
-type OtpAudit struct {
+type SystemOtpAudit struct {
 	ID            uuid.UUID          `json:"id"`
 	OtpID         uuid.UUID          `json:"otp_id"`
 	Target        string             `json:"target"`
@@ -95,7 +149,39 @@ type OtpAudit struct {
 	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
 }
 
-type Session struct {
+type SystemPackageSizePricing struct {
+	ID          uuid.UUID          `json:"id"`
+	ServiceID   uuid.UUID          `json:"service_id"`
+	PackageSize string             `json:"package_size"`
+	ExtraPrice  pgtype.Numeric     `json:"extra_price"`
+	IsActive    bool               `json:"is_active"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type SystemService struct {
+	ID        uuid.UUID          `json:"id"`
+	Code      string             `json:"code"`
+	Name      string             `json:"name"`
+	BasePrice pgtype.Numeric     `json:"base_price"`
+	MinPrice  pgtype.Numeric     `json:"min_price"`
+	IsActive  bool               `json:"is_active"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type SystemServiceZone struct {
+	ID        uuid.UUID          `json:"id"`
+	ZoneID    uuid.UUID          `json:"zone_id"`
+	ServiceID uuid.UUID          `json:"service_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type SystemSession struct {
 	ID                 uuid.UUID          `json:"id"`
 	AccountAppDeviceID uuid.UUID          `json:"account_app_device_id"`
 	RefreshTokenHash   string             `json:"refresh_token_hash"`
@@ -112,18 +198,55 @@ type Session struct {
 	DeletedAt          pgtype.Timestamptz `json:"deleted_at"`
 }
 
-type Setting struct {
+type SystemSetting struct {
 	ID          uuid.UUID          `json:"id"`
 	AccountID   uuid.UUID          `json:"account_id"`
 	Key         string             `json:"key"`
 	Value       []byte             `json:"value"`
-	Type        interface{}        `json:"type"`
+	Type        string             `json:"type"`
 	Description pgtype.Text        `json:"description"`
 	IsActive    pgtype.Bool        `json:"is_active"`
 	Metadata    []byte             `json:"metadata"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type SystemSidebar struct {
+	ID          uuid.UUID          `json:"id"`
+	Context     string             `json:"context"`
+	Version     string             `json:"version"`
+	GeneratedAt pgtype.Timestamptz `json:"generated_at"`
+	Items       []byte             `json:"items"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type SystemSurchargeRule struct {
+	ID            uuid.UUID          `json:"id"`
+	ServiceID     uuid.UUID          `json:"service_id"`
+	ZoneID        uuid.UUID          `json:"zone_id"`
+	SurchargeType string             `json:"surcharge_type"`
+	Amount        pgtype.Numeric     `json:"amount"`
+	Unit          string             `json:"unit"`
+	Condition     []byte             `json:"condition"`
+	IsActive      bool               `json:"is_active"`
+	CreatedAt     pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type SystemZone struct {
+	ID              uuid.UUID          `json:"id"`
+	Code            string             `json:"code"`
+	Name            string             `json:"name"`
+	Polygon         interface{}        `json:"polygon"`
+	PriceMultiplier pgtype.Numeric     `json:"price_multiplier"`
+	IsActive        bool               `json:"is_active"`
+	CreatedAt       pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt       pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt       pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type UserProfile struct {

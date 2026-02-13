@@ -13,7 +13,7 @@ import (
 )
 
 const countOTPsCreatedSince = `-- name: CountOTPsCreatedSince :one
-SELECT COUNT(*)::int FROM otps
+SELECT COUNT(*)::int FROM system_otps
 WHERE target = $1 AND purpose = $2 AND created_at >= $3
 `
 
@@ -31,7 +31,7 @@ func (q *Queries) CountOTPsCreatedSince(ctx context.Context, arg CountOTPsCreate
 }
 
 const createOTP = `-- name: CreateOTP :one
-INSERT INTO otps (
+INSERT INTO system_otps (
     target,
     otp_code,
     purpose,
@@ -50,7 +50,7 @@ type CreateOTPParams struct {
 	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
 }
 
-func (q *Queries) CreateOTP(ctx context.Context, arg CreateOTPParams) (Otp, error) {
+func (q *Queries) CreateOTP(ctx context.Context, arg CreateOTPParams) (SystemOtp, error) {
 	row := q.db.QueryRow(ctx, createOTP,
 		arg.Target,
 		arg.OtpCode,
@@ -58,7 +58,7 @@ func (q *Queries) CreateOTP(ctx context.Context, arg CreateOTPParams) (Otp, erro
 		arg.MaxAttempt,
 		arg.ExpiresAt,
 	)
-	var i Otp
+	var i SystemOtp
 	err := row.Scan(
 		&i.ID,
 		&i.Target,
@@ -78,7 +78,7 @@ func (q *Queries) CreateOTP(ctx context.Context, arg CreateOTPParams) (Otp, erro
 }
 
 const expireOldOTPs = `-- name: ExpireOldOTPs :exec
-UPDATE otps
+UPDATE system_otps
 SET status = 'expired',
     updated_at = now()
 WHERE expires_at < now()
@@ -91,7 +91,7 @@ func (q *Queries) ExpireOldOTPs(ctx context.Context) error {
 }
 
 const getActiveOTP = `-- name: GetActiveOTP :one
-SELECT id, target, otp_code, purpose, attempt_count, max_attempt, expires_at, used_at, status, metadata, created_at, updated_at, deleted_at FROM otps
+SELECT id, target, otp_code, purpose, attempt_count, max_attempt, expires_at, used_at, status, metadata, created_at, updated_at, deleted_at FROM system_otps
 WHERE target = $1 
   AND purpose = $2 
   AND status = 'active'
@@ -105,9 +105,9 @@ type GetActiveOTPParams struct {
 	Purpose string `json:"purpose"`
 }
 
-func (q *Queries) GetActiveOTP(ctx context.Context, arg GetActiveOTPParams) (Otp, error) {
+func (q *Queries) GetActiveOTP(ctx context.Context, arg GetActiveOTPParams) (SystemOtp, error) {
 	row := q.db.QueryRow(ctx, getActiveOTP, arg.Target, arg.Purpose)
-	var i Otp
+	var i SystemOtp
 	err := row.Scan(
 		&i.ID,
 		&i.Target,
@@ -127,7 +127,7 @@ func (q *Queries) GetActiveOTP(ctx context.Context, arg GetActiveOTPParams) (Otp
 }
 
 const getLastOTPCreatedAt = `-- name: GetLastOTPCreatedAt :one
-SELECT created_at FROM otps
+SELECT created_at FROM system_otps
 WHERE target = $1 AND purpose = $2
 ORDER BY created_at DESC
 LIMIT 1
@@ -146,7 +146,7 @@ func (q *Queries) GetLastOTPCreatedAt(ctx context.Context, arg GetLastOTPCreated
 }
 
 const getOldestOTPCreatedAtSince = `-- name: GetOldestOTPCreatedAtSince :one
-SELECT created_at FROM otps
+SELECT created_at FROM system_otps
 WHERE target = $1 AND purpose = $2 AND created_at >= $3
 ORDER BY created_at ASC
 LIMIT 1
@@ -166,7 +166,7 @@ func (q *Queries) GetOldestOTPCreatedAtSince(ctx context.Context, arg GetOldestO
 }
 
 const incrementOTPAttempt = `-- name: IncrementOTPAttempt :exec
-UPDATE otps
+UPDATE system_otps
 SET attempt_count = attempt_count + 1,
     updated_at = now()
 WHERE id = $1
@@ -178,7 +178,7 @@ func (q *Queries) IncrementOTPAttempt(ctx context.Context, id uuid.UUID) error {
 }
 
 const lockOTP = `-- name: LockOTP :exec
-UPDATE otps
+UPDATE system_otps
 SET status = 'locked',
     updated_at = now()
 WHERE id = $1
@@ -190,7 +190,7 @@ func (q *Queries) LockOTP(ctx context.Context, id uuid.UUID) error {
 }
 
 const lockOTPWithCount = `-- name: LockOTPWithCount :exec
-UPDATE otps
+UPDATE system_otps
 SET status = 'locked',
     attempt_count = $2,
     updated_at = now()
@@ -208,7 +208,7 @@ func (q *Queries) LockOTPWithCount(ctx context.Context, arg LockOTPWithCountPara
 }
 
 const markOTPAsUsed = `-- name: MarkOTPAsUsed :exec
-UPDATE otps
+UPDATE system_otps
 SET status = 'used',
     used_at = now(),
     updated_at = now()
@@ -221,7 +221,7 @@ func (q *Queries) MarkOTPAsUsed(ctx context.Context, id uuid.UUID) error {
 }
 
 const markOTPAsUsedWithCount = `-- name: MarkOTPAsUsedWithCount :exec
-UPDATE otps
+UPDATE system_otps
 SET status = 'used',
     used_at = now(),
     attempt_count = $2,

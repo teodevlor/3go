@@ -4,8 +4,8 @@ DO $$
 DECLARE
     v_account_id uuid;
 BEGIN
-    -- Attempt to find a system account or create a placeholder for system settings
-    -- because settings.account_id is NOT NULL.
+    -- Attempt to find a system account or create a placeholder for system system_settings
+    -- because system_settings.account_id is NOT NULL.
     SELECT id INTO v_account_id FROM accounts WHERE email = 'system@internal' LIMIT 1;
 
     IF v_account_id IS NULL THEN
@@ -15,18 +15,10 @@ BEGIN
         RETURNING id INTO v_account_id;
     END IF;
 
-    -- Insert config_resent_otp setting
-    IF NOT EXISTS (SELECT 1 FROM settings WHERE key = 'config_resent_otp' AND account_id = v_account_id) THEN
-        INSERT INTO settings (
-            account_id,
-            key,
-            value,
-            type,
-            description,
-            is_active,
-            metadata,
-            created_at,
-            updated_at
+    -- Insert config_resent_otp (resend OTP)
+    IF NOT EXISTS (SELECT 1 FROM system_settings WHERE key = 'config_resent_otp' AND account_id = v_account_id) THEN
+        INSERT INTO system_settings (
+            account_id, key, value, type, description, is_active, metadata, created_at, updated_at
         ) VALUES (
             v_account_id,
             'config_resent_otp',
@@ -44,10 +36,7 @@ BEGIN
             }'::jsonb,
             'web_system',
             'Config resent OTP with progressive blocking mechanism',
-            true,
-            '{}'::jsonb,
-            NOW(),
-            NOW()
+            true, '{}'::jsonb, NOW(), NOW()
         );
     END IF;
 END
@@ -56,7 +45,7 @@ $$;
 
 -- +goose Down
 -- +goose StatementBegin
-DELETE FROM settings WHERE key = 'config_resent_otp';
--- Optional: We generally don't delete the system account in down migration 
+DELETE FROM system_settings WHERE key = 'config_resent_otp';
+-- Optional: We generally don't delete the system account in down migration
 -- as it might be used by other things or created manually.
 -- +goose StatementEnd

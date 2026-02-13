@@ -5,17 +5,27 @@ import (
 	"go-structure/internal/helper/database"
 	account_repo "go-structure/internal/repository"
 	user_profile_repo "go-structure/internal/repository/app_user"
+	settingRepository "go-structure/internal/repository/web_system"
 	usecase_pkg "go-structure/internal/usecase"
 	user_profile_usecase "go-structure/internal/usecase/app_user"
+	websystem_usecase "go-structure/internal/usecase/web_system"
 
 	"github.com/sarulabs/di"
 )
 
 const (
-	UserProfileUsecaseDIName = "user_profile_usecase_di"
-	NotifyUsecaseDIName      = "notify_usecase_di"
-	SettingUsecaseDIName     = "setting_usecase_di"
-	OTPUsecaseDIName         = "otp_usecase_di"
+	UserProfileUsecaseDIName         = "user_profile_usecase_di"
+	NotifyUsecaseDIName              = "notify_usecase_di"
+	SettingUsecaseDIName             = "setting_usecase_di"
+	OTPUsecaseDIName                 = "otp_usecase_di"
+	ZoneUsecaseDIName                = "zone_usecase_di"
+	SidebarUsecaseDIName             = "sidebar_usecase_di"
+	ServiceUsecaseDIName             = "service_usecase_di"
+	ServiceZoneUsecaseDIName         = "service_zone_usecase_di"
+	DistancePricingRuleUsecaseDIName = "distance_pricing_rule_usecase_di"
+	SurchargeRuleUsecaseDIName       = "surcharge_rule_usecase_di"
+	PackageSizePricingUsecaseDIName  = "package_size_pricing_usecase_di"
+	AuthAdminUsecaseDIName           = "auth_admin_usecase_di"
 )
 
 func buildUsecases() error {
@@ -71,8 +81,8 @@ func buildUsecases() error {
 		Name:  SettingUsecaseDIName,
 		Scope: di.App,
 		Build: func(ctn di.Container) (interface{}, error) {
-			settingRepo := ctn.Get(SettingRepoDIName).(account_repo.ISettingRepository)
-			return usecase_pkg.NewSettingUsecase(settingRepo), nil
+			settingRepo := ctn.Get(SettingRepoDIName).(settingRepository.ISettingRepository)
+			return websystem_usecase.NewSettingUsecase(settingRepo), nil
 		},
 	}
 
@@ -95,5 +105,105 @@ func buildUsecases() error {
 		},
 	}
 
-	return builder.Add(userProfileDef, notifyDef, settingDef, otpDef)
+	zoneDef := di.Def{
+		Name:  ZoneUsecaseDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			zoneRepo := ctn.Get(ZoneRepoDIName).(account_repo.IZoneRepository)
+			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
+			return websystem_usecase.NewZoneUsecase(zoneRepo, txManager), nil
+		},
+	}
+
+	sidebarDef := di.Def{
+		Name:  SidebarUsecaseDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			sidebarRepo := ctn.Get(SidebarRepoDIName).(settingRepository.ISidebarRepository)
+			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
+			return websystem_usecase.NewSidebarUsecase(sidebarRepo, txManager), nil
+		},
+	}
+
+	serviceDef := di.Def{
+		Name:  ServiceUsecaseDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			serviceRepo := ctn.Get(ServiceRepoDIName).(settingRepository.IServiceRepository)
+			serviceZoneUc := ctn.Get(ServiceZoneUsecaseDIName).(websystem_usecase.IServiceZoneUsecase)
+			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
+			return websystem_usecase.NewServiceUsecase(serviceRepo, serviceZoneUc, txManager), nil
+		},
+	}
+
+	serviceZoneDef := di.Def{
+		Name:  ServiceZoneUsecaseDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			repo := ctn.Get(ServiceZoneRepoDIName).(settingRepository.IServiceZoneRepository)
+			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
+			return websystem_usecase.NewServiceZoneUsecase(repo, txManager), nil
+		},
+	}
+
+	distancePricingRuleDef := di.Def{
+		Name:  DistancePricingRuleUsecaseDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			repo := ctn.Get(DistancePricingRuleRepoDIName).(settingRepository.IDistancePricingRuleRepository)
+			serviceRepo := ctn.Get(ServiceRepoDIName).(settingRepository.IServiceRepository)
+			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
+			return websystem_usecase.NewDistancePricingRuleUsecase(repo, serviceRepo, txManager), nil
+		},
+	}
+
+	surchargeRuleDef := di.Def{
+		Name:  SurchargeRuleUsecaseDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			repo := ctn.Get(SurchargeRuleRepoDIName).(settingRepository.ISurchargeRuleRepository)
+			serviceRepo := ctn.Get(ServiceRepoDIName).(settingRepository.IServiceRepository)
+			zoneRepo := ctn.Get(ZoneRepoDIName).(account_repo.IZoneRepository)
+			transactionManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
+			return websystem_usecase.NewSurchargeRuleUsecase(repo, serviceRepo, zoneRepo, transactionManager), nil
+		},
+	}
+
+	packageSizePricingDef := di.Def{
+		Name:  PackageSizePricingUsecaseDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			repo := ctn.Get(PackageSizePricingRepoDIName).(settingRepository.IPackageSizePricingRepository)
+			serviceRepo := ctn.Get(ServiceRepoDIName).(settingRepository.IServiceRepository)
+			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
+			return websystem_usecase.NewPackageSizePricingUsecase(repo, serviceRepo, txManager), nil
+		},
+	}
+
+	authAdminDef := di.Def{
+		Name:  AuthAdminUsecaseDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			adminRepo := ctn.Get(SystemAdminRepoDIName).(settingRepository.ISystemAdminRepository)
+			loginHistoryRepo := ctn.Get(SystemLoginHistoryRepoDIName).(settingRepository.ISystemLoginHistoryRepository)
+			refreshTokenRepo := ctn.Get(SystemAdminRefreshTokenRepoDIName).(settingRepository.ISystemAdminRefreshTokenRepository)
+			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
+			return websystem_usecase.NewAuthAdminUsecase(adminRepo, loginHistoryRepo, refreshTokenRepo, txManager), nil
+		},
+	}
+
+	return builder.Add(
+		userProfileDef,
+		notifyDef,
+		settingDef,
+		otpDef,
+		zoneDef,
+		sidebarDef,
+		serviceZoneDef,
+		serviceDef,
+		distancePricingRuleDef,
+		surchargeRuleDef,
+		packageSizePricingDef,
+		authAdminDef,
+	)
 }

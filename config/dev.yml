@@ -34,6 +34,7 @@ logger:
   channels:
     auth: ./storage/logs/auth.log
     http: ./storage/logs/http.log
+    zone: ./storage/logs/zone.log
 telegram:
   bot_token: 8335198085:AAEEuPGcI-mB9fSOkEeuciKSCJHoeNmoXIw
   chat_id: 6402448229

@@ -6,6 +6,7 @@ sql:
       - internal/orm/postgres/migrations
     queries:
       - internal/orm/postgres/queries
+      - internal/orm/postgres/queries/web_system
     gen:
       go:
         package: "pgdb"
@@ -19,3 +20,7 @@ sql:
             go_type:
               import: "github.com/google/uuid"
               type: "UUID"
+          - column: "system_admins.department"
+            go_type: "string"
+          - column: "system_settings.type"
+            go_type: "string"

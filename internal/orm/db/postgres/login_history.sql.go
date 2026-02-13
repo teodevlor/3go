@@ -13,7 +13,7 @@ import (
 )
 
 const createLoginHistory = `-- name: CreateLoginHistory :one
-INSERT INTO login_histories (
+INSERT INTO app_login_histories (
     account_id,
     device_id,
     app_type,
@@ -40,7 +40,7 @@ type CreateLoginHistoryParams struct {
 	Metadata      []byte      `json:"metadata"`
 }
 
-func (q *Queries) CreateLoginHistory(ctx context.Context, arg CreateLoginHistoryParams) (LoginHistory, error) {
+func (q *Queries) CreateLoginHistory(ctx context.Context, arg CreateLoginHistoryParams) (AppLoginHistory, error) {
 	row := q.db.QueryRow(ctx, createLoginHistory,
 		arg.AccountID,
 		arg.DeviceID,
@@ -52,7 +52,7 @@ func (q *Queries) CreateLoginHistory(ctx context.Context, arg CreateLoginHistory
 		arg.Location,
 		arg.Metadata,
 	)
-	var i LoginHistory
+	var i AppLoginHistory
 	err := row.Scan(
 		&i.ID,
 		&i.AccountID,

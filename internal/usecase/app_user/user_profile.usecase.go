@@ -419,7 +419,7 @@ func (u *userProfileUsecase) logLoginHistory(
 			reason = loginErr.Error()
 		}
 	}
-	_, err := u.loginHistoryRepo.CreateLoginHistory(ctx, &model.LoginHistory{
+	_, err := u.loginHistoryRepo.CreateLoginHistory(ctx, &model.AppLoginHistory{
 		AccountID:     accountID,
 		DeviceID:      deviceID,
 		AppType:       appType,

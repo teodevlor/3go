@@ -1,5 +1,5 @@
 -- name: CreateOTP :one
-INSERT INTO otps (
+INSERT INTO system_otps (
     target,
     otp_code,
     purpose,
@@ -10,7 +10,7 @@ INSERT INTO otps (
 ) RETURNING *;
 
 -- name: GetActiveOTP :one
-SELECT * FROM otps
+SELECT * FROM system_otps
 WHERE target = $1 
   AND purpose = $2 
   AND status = 'active'
@@ -19,14 +19,14 @@ ORDER BY created_at DESC
 LIMIT 1;
 
 -- name: MarkOTPAsUsed :exec
-UPDATE otps
+UPDATE system_otps
 SET status = 'used',
     used_at = now(),
     updated_at = now()
 WHERE id = $1;
 
 -- name: MarkOTPAsUsedWithCount :exec
-UPDATE otps
+UPDATE system_otps
 SET status = 'used',
     used_at = now(),
     attempt_count = $2,
@@ -34,43 +34,43 @@ SET status = 'used',
 WHERE id = $1;
 
 -- name: IncrementOTPAttempt :exec
-UPDATE otps
+UPDATE system_otps
 SET attempt_count = attempt_count + 1,
     updated_at = now()
 WHERE id = $1;
 
 -- name: LockOTP :exec
-UPDATE otps
+UPDATE system_otps
 SET status = 'locked',
     updated_at = now()
 WHERE id = $1;
 
 -- name: LockOTPWithCount :exec
-UPDATE otps
+UPDATE system_otps
 SET status = 'locked',
     attempt_count = $2,
     updated_at = now()
 WHERE id = $1;
 
 -- name: ExpireOldOTPs :exec
-UPDATE otps
+UPDATE system_otps
 SET status = 'expired',
     updated_at = now()
 WHERE expires_at < now()
   AND status = 'active';
 
 -- name: GetLastOTPCreatedAt :one
-SELECT created_at FROM otps
+SELECT created_at FROM system_otps
 WHERE target = $1 AND purpose = $2
 ORDER BY created_at DESC
 LIMIT 1;
 
 -- name: CountOTPsCreatedSince :one
-SELECT COUNT(*)::int FROM otps
+SELECT COUNT(*)::int FROM system_otps
 WHERE target = $1 AND purpose = $2 AND created_at >= $3;
 
 -- name: GetOldestOTPCreatedAtSince :one
-SELECT created_at FROM otps
+SELECT created_at FROM system_otps
 WHERE target = $1 AND purpose = $2 AND created_at >= $3
 ORDER BY created_at ASC
 LIMIT 1;

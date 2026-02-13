@@ -13,7 +13,7 @@ import (
 )
 
 const createSession = `-- name: CreateSession :one
-INSERT INTO sessions (
+INSERT INTO system_sessions (
     account_app_device_id,
     refresh_token_hash,
     expires_at,
@@ -34,7 +34,7 @@ type CreateSessionParams struct {
 	Metadata           []byte             `json:"metadata"`
 }
 
-func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error) {
+func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (SystemSession, error) {
 	row := q.db.QueryRow(ctx, createSession,
 		arg.AccountAppDeviceID,
 		arg.RefreshTokenHash,
@@ -43,7 +43,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 		arg.UserAgent,
 		arg.Metadata,
 	)
-	var i Session
+	var i SystemSession
 	err := row.Scan(
 		&i.ID,
 		&i.AccountAppDeviceID,
@@ -64,7 +64,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 }
 
 const deleteExpiredSessions = `-- name: DeleteExpiredSessions :exec
-UPDATE sessions
+UPDATE system_sessions
 SET deleted_at = CURRENT_TIMESTAMP
 WHERE expires_at < CURRENT_TIMESTAMP
   AND deleted_at IS NULL
@@ -76,13 +76,13 @@ func (q *Queries) DeleteExpiredSessions(ctx context.Context) error {
 }
 
 const getSessionByID = `-- name: GetSessionByID :one
-SELECT id, account_app_device_id, refresh_token_hash, expires_at, is_revoked, revoked_at, revoked_reason, last_active_at, ip_address, user_agent, metadata, created_at, updated_at, deleted_at FROM sessions
+SELECT id, account_app_device_id, refresh_token_hash, expires_at, is_revoked, revoked_at, revoked_reason, last_active_at, ip_address, user_agent, metadata, created_at, updated_at, deleted_at FROM system_sessions
 WHERE id = $1 AND deleted_at IS NULL
 `
 
-func (q *Queries) GetSessionByID(ctx context.Context, id uuid.UUID) (Session, error) {
+func (q *Queries) GetSessionByID(ctx context.Context, id uuid.UUID) (SystemSession, error) {
 	row := q.db.QueryRow(ctx, getSessionByID, id)
-	var i Session
+	var i SystemSession
 	err := row.Scan(
 		&i.ID,
 		&i.AccountAppDeviceID,
@@ -103,15 +103,15 @@ func (q *Queries) GetSessionByID(ctx context.Context, id uuid.UUID) (Session, er
 }
 
 const getSessionByRefreshTokenHash = `-- name: GetSessionByRefreshTokenHash :one
-SELECT id, account_app_device_id, refresh_token_hash, expires_at, is_revoked, revoked_at, revoked_reason, last_active_at, ip_address, user_agent, metadata, created_at, updated_at, deleted_at FROM sessions
+SELECT id, account_app_device_id, refresh_token_hash, expires_at, is_revoked, revoked_at, revoked_reason, last_active_at, ip_address, user_agent, metadata, created_at, updated_at, deleted_at FROM system_sessions
 WHERE refresh_token_hash = $1
   AND is_revoked = false
   AND deleted_at IS NULL
 `
 
-func (q *Queries) GetSessionByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (Session, error) {
+func (q *Queries) GetSessionByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (SystemSession, error) {
 	row := q.db.QueryRow(ctx, getSessionByRefreshTokenHash, refreshTokenHash)
-	var i Session
+	var i SystemSession
 	err := row.Scan(
 		&i.ID,
 		&i.AccountAppDeviceID,
@@ -133,7 +133,7 @@ func (q *Queries) GetSessionByRefreshTokenHash(ctx context.Context, refreshToken
 
 const listActiveSessions = `-- name: ListActiveSessions :many
 SELECT s.id, s.account_app_device_id, s.refresh_token_hash, s.expires_at, s.is_revoked, s.revoked_at, s.revoked_reason, s.last_active_at, s.ip_address, s.user_agent, s.metadata, s.created_at, s.updated_at, s.deleted_at, aad.account_id, aad.device_id, aad.app_type
-FROM sessions s
+FROM system_sessions s
 JOIN account_app_devices aad ON s.account_app_device_id = aad.id
 WHERE aad.account_id = $1
   AND s.is_revoked = false
@@ -201,7 +201,7 @@ func (q *Queries) ListActiveSessions(ctx context.Context, accountID uuid.UUID) (
 }
 
 const revokeAllSessionsByAccount = `-- name: RevokeAllSessionsByAccount :exec
-UPDATE sessions
+UPDATE system_sessions
 SET
     is_revoked = true,
     revoked_at = CURRENT_TIMESTAMP,
@@ -222,7 +222,7 @@ func (q *Queries) RevokeAllSessionsByAccount(ctx context.Context, arg RevokeAllS
 }
 
 const revokeAllSessionsByAccountAppDevice = `-- name: RevokeAllSessionsByAccountAppDevice :exec
-UPDATE sessions
+UPDATE system_sessions
 SET
     is_revoked = true,
     revoked_at = CURRENT_TIMESTAMP,
@@ -241,7 +241,7 @@ func (q *Queries) RevokeAllSessionsByAccountAppDevice(ctx context.Context, arg R
 }
 
 const revokeSession = `-- name: RevokeSession :exec
-UPDATE sessions
+UPDATE system_sessions
 SET
     is_revoked = true,
     revoked_at = CURRENT_TIMESTAMP,
@@ -260,7 +260,7 @@ func (q *Queries) RevokeSession(ctx context.Context, arg RevokeSessionParams) er
 }
 
 const revokeSessionByRefreshToken = `-- name: RevokeSessionByRefreshToken :exec
-UPDATE sessions
+UPDATE system_sessions
 SET
     is_revoked = true,
     revoked_at = CURRENT_TIMESTAMP,
@@ -279,7 +279,7 @@ func (q *Queries) RevokeSessionByRefreshToken(ctx context.Context, arg RevokeSes
 }
 
 const updateSessionActivity = `-- name: UpdateSessionActivity :exec
-UPDATE sessions
+UPDATE system_sessions
 SET last_active_at = CURRENT_TIMESTAMP
 WHERE id = $1
 `

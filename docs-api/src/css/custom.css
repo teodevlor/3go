@@ -1,0 +1,103 @@
+/**
+ * Custom styles cho API Documentation
+ */
+
+:root {
+  --ifm-color-primary: #ea580c;
+  --ifm-color-primary-dark: #d14d0b;
+  --ifm-color-primary-darker: #b84309;
+  --ifm-color-primary-darkest: #9a3808;
+  --ifm-color-primary-light: #f0620d;
+  --ifm-color-primary-lighter: #f97316;
+  --ifm-color-primary-lightest: #fb923c;
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #f97316;
+  --ifm-color-primary-dark: #ea580c;
+  --ifm-color-primary-darker: #d14d0b;
+  --ifm-color-primary-darkest: #b84309;
+  --ifm-color-primary-light: #fb923c;
+  --ifm-color-primary-lighter: #fdba74;
+  --ifm-color-primary-lightest: #fed7aa;
+}
+
+/* HTTP method badges */
+.http-method {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.http-get { background: #61affe; color: #fff; }
+.http-post { background: #49cc90; color: #fff; }
+.http-put { background: #fca130; color: #fff; }
+.http-patch { background: #50e3c2; color: #000; }
+.http-delete { background: #f93e3e; color: #fff; }
+
+/* Cấu hình biến API (Base URL, Access token) */
+.api-docs-config {
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin: 1rem 0 1.5rem;
+  background: var(--ifm-background-surface-color);
+}
+
+.api-docs-config__form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  margin-top: 0.75rem;
+}
+
+.api-docs-config__input {
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 6px;
+  font-size: 0.9rem;
+  min-width: 200px;
+  flex: 1;
+}
+
+.api-docs-config__btn {
+  padding: 0.35rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid var(--ifm-color-primary);
+  background: var(--ifm-color-primary);
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.api-docs-config__btn:hover {
+  opacity: 0.9;
+}
+
+.api-docs-config__status {
+  font-size: 0.85rem;
+  color: var(--ifm-color-success);
+}
+
+/* Toast "Đã sao chép!" khi copy cURL */
+.api-toast {
+  position: fixed;
+  bottom: 1.5rem;
+  right: 1.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  background: var(--ifm-color-primary);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 9999;
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+.api-toast--out {
+  opacity: 0;
+}

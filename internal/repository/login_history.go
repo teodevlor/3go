@@ -14,7 +14,7 @@ import (
 
 type (
 	ILoginHistoryRepository interface {
-		CreateLoginHistory(ctx context.Context, loginHistory *model.LoginHistory) (*model.LoginHistory, error)
+		CreateLoginHistory(ctx context.Context, loginHistory *model.AppLoginHistory) (*model.AppLoginHistory, error)
 	}
 
 	loginHistoryRepository struct {
@@ -26,7 +26,7 @@ func NewLoginHistoryRepository(pool *pgxpool.Pool) ILoginHistoryRepository {
 	return &loginHistoryRepository{pool: pool}
 }
 
-func (r *loginHistoryRepository) CreateLoginHistory(ctx context.Context, loginHistory *model.LoginHistory) (*model.LoginHistory, error) {
+func (r *loginHistoryRepository) CreateLoginHistory(ctx context.Context, loginHistory *model.AppLoginHistory) (*model.AppLoginHistory, error) {
 	db := database.GetQueries(ctx, r.pool)
 
 	params := pgdb.CreateLoginHistoryParams{
@@ -58,5 +58,5 @@ func (r *loginHistoryRepository) CreateLoginHistory(ctx context.Context, loginHi
 		return nil, err
 	}
 
-	return mapper.ToLoginHistory(row), nil
+	return mapper.ToAppLoginHistory(row), nil
 }

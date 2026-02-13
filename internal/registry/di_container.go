@@ -9,6 +9,7 @@ import (
 	v1 "go-structure/internal/api/v1"
 	otpcontroller "go-structure/internal/controller"
 	controller "go-structure/internal/controller/app_user"
+	websystem_controller "go-structure/internal/controller/web_system"
 	"go-structure/internal/helper/database"
 
 	"github.com/gin-gonic/gin"
@@ -148,9 +149,29 @@ func buildApis() error {
 		Build: func(ctn di.Container) (interface{}, error) {
 			router := gin.Default()
 			// router := gin.New()
+
 			userProfileController := ctn.Get(UserProfileControllerDIName).(controller.UserProfileController)
 			otpController := ctn.Get(OTPControllerDIName).(otpcontroller.OTPController)
-			v1.NewApiV1(router, userProfileController, otpController)
+			authAdminController := ctn.Get(AuthAdminControllerDIName).(websystem_controller.AuthAdminController)
+			zoneController := ctn.Get(ZoneControllerDIName).(websystem_controller.ZoneController)
+			sidebarController := ctn.Get(SidebarControllerDIName).(websystem_controller.SidebarController)
+			serviceController := ctn.Get(ServiceControllerDIName).(websystem_controller.ServiceController)
+			distancePricingRuleController := ctn.Get(DistancePricingRuleControllerDIName).(websystem_controller.DistancePricingRuleController)
+			surchargeRuleController := ctn.Get(SurchargeRuleControllerDIName).(websystem_controller.SurchargeRuleController)
+			packageSizePricingController := ctn.Get(PackageSizePricingControllerDIName).(websystem_controller.PackageSizePricingController)
+
+			v1.NewApiV1(
+				router,
+				userProfileController,
+				otpController,
+				authAdminController,
+				zoneController,
+				sidebarController,
+				serviceController,
+				distancePricingRuleController,
+				surchargeRuleController,
+				packageSizePricingController,
+			)
 			return router, nil
 		},
 	}

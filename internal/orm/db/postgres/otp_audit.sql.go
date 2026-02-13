@@ -14,7 +14,7 @@ import (
 )
 
 const createOTPAudit = `-- name: CreateOTPAudit :one
-INSERT INTO otp_audits (
+INSERT INTO system_otp_audits (
     otp_id,
     target,
     purpose,
@@ -41,7 +41,7 @@ type CreateOTPAuditParams struct {
 	Metadata      []byte      `json:"metadata"`
 }
 
-func (q *Queries) CreateOTPAudit(ctx context.Context, arg CreateOTPAuditParams) (OtpAudit, error) {
+func (q *Queries) CreateOTPAudit(ctx context.Context, arg CreateOTPAuditParams) (SystemOtpAudit, error) {
 	row := q.db.QueryRow(ctx, createOTPAudit,
 		arg.OtpID,
 		arg.Target,
@@ -53,7 +53,7 @@ func (q *Queries) CreateOTPAudit(ctx context.Context, arg CreateOTPAuditParams) 
 		arg.UserAgent,
 		arg.Metadata,
 	)
-	var i OtpAudit
+	var i SystemOtpAudit
 	err := row.Scan(
 		&i.ID,
 		&i.OtpID,

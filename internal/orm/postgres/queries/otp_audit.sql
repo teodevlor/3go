@@ -1,5 +1,5 @@
 -- name: CreateOTPAudit :one
-INSERT INTO otp_audits (
+INSERT INTO system_otp_audits (
     otp_id,
     target,
     purpose,

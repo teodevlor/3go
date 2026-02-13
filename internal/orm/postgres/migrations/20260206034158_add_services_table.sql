@@ -1,7 +1,7 @@
 -- +goose Up
 -- +goose StatementBegin
 
-CREATE TABLE IF NOT EXISTS services (
+CREATE TABLE IF NOT EXISTS system_services (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     code VARCHAR(100) NOT NULL,
@@ -15,20 +15,20 @@ CREATE TABLE IF NOT EXISTS services (
     deleted_at TIMESTAMPTZ
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_services_code_unique
-ON services(code)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_system_services_code_unique
+ON system_services(code)
 WHERE deleted_at IS NULL;
 
-CREATE INDEX IF NOT EXISTS idx_services_is_active
-ON services(is_active);
+CREATE INDEX IF NOT EXISTS idx_system_services_is_active
+ON system_services(is_active);
 
-CREATE INDEX IF NOT EXISTS idx_services_deleted_at
-ON services(deleted_at)
+CREATE INDEX IF NOT EXISTS idx_system_services_deleted_at
+ON system_services(deleted_at)
 WHERE deleted_at IS NULL;
 
-DROP TRIGGER IF EXISTS update_services_updated_at ON services;
-CREATE TRIGGER update_services_updated_at
-BEFORE UPDATE ON services
+DROP TRIGGER IF EXISTS update_system_services_updated_at ON system_services;
+CREATE TRIGGER update_system_services_updated_at
+BEFORE UPDATE ON system_services
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
@@ -38,12 +38,12 @@ EXECUTE FUNCTION update_updated_at_column();
 -- +goose Down
 -- +goose StatementBegin
 
-DROP TRIGGER IF EXISTS update_services_updated_at ON services;
+DROP TRIGGER IF EXISTS update_system_services_updated_at ON system_services;
 
-DROP INDEX IF EXISTS idx_services_deleted_at;
-DROP INDEX IF EXISTS idx_services_is_active;
-DROP INDEX IF EXISTS idx_services_code_unique;
+DROP INDEX IF EXISTS idx_system_services_deleted_at;
+DROP INDEX IF EXISTS idx_system_services_is_active;
+DROP INDEX IF EXISTS idx_system_services_code_unique;
 
-DROP TABLE IF EXISTS services;
+DROP TABLE IF EXISTS system_services;
 
 -- +goose StatementEnd

@@ -7,7 +7,7 @@ import (
 	"go-structure/internal/repository/model"
 )
 
-func ToSession(row pgdb.Session) *model.Session {
+func ToSession(row pgdb.SystemSession) *model.Session {
 	var revokedAt *time.Time
 	if row.RevokedAt.Valid {
 		t := row.RevokedAt.Time

@@ -1,0 +1,18 @@
+FROM golang:1.22-alpine as builder-dev
+
+ENV GOTOOLCHAIN=auto
+
+WORKDIR /gogogo-api
+
+RUN apk add --no-cache git build-base
+
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
+
+COPY . .
+
+RUN go install github.com/air-verse/air@latest
+
+EXPOSE 8080
+
+CMD ["air", "-c", ".air.toml"]

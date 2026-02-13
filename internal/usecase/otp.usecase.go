@@ -19,7 +19,6 @@ import (
 type (
 	IOTPUsecase interface {
 		CreateOTP(ctx context.Context, target string, purpose string) (string, error)
-		// VerifyOTP nhận thêm ip & userAgent để log audit đầy đủ
 		VerifyOTP(ctx context.Context, target string, code string, purpose string, ip string, userAgent string) (bool, error)
 		ResendOTP(ctx context.Context, target string, purpose string) (string, error)
 		CreateForgotPasswordOTP(ctx context.Context, target string) (string, error)

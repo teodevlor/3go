@@ -2,9 +2,9 @@
 -- +goose StatementBegin
 
 -- =====================
--- Sessions table (phiên đăng nhập cụ thể: account + device + app)
+-- system_Sessions table (phiên đăng nhập cụ thể: account + device + app)
 -- =====================
-CREATE TABLE IF NOT EXISTS sessions (
+CREATE TABLE IF NOT EXISTS system_sessions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
     account_app_device_id UUID NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     deleted_at TIMESTAMPTZ,
 
     -- Foreign keys
-    CONSTRAINT fk_sessions_account_app_device
+    CONSTRAINT fk_system_sessions_account_app_device
         FOREIGN KEY (account_app_device_id)
         REFERENCES account_app_devices(id)
         ON DELETE CASCADE
@@ -38,32 +38,32 @@ CREATE TABLE IF NOT EXISTS sessions (
 -- =====================
 -- Indexes
 -- =====================
-CREATE UNIQUE INDEX IF NOT EXISTS idx_sessions_refresh_token_hash_unique
-ON sessions(refresh_token_hash)
+CREATE UNIQUE INDEX IF NOT EXISTS idx_system_sessions_refresh_token_hash_unique
+ON system_sessions(refresh_token_hash)
 WHERE is_revoked = false AND deleted_at IS NULL;
 
-CREATE INDEX IF NOT EXISTS idx_sessions_account_app_device_id
-ON sessions(account_app_device_id);
+CREATE INDEX IF NOT EXISTS idx_system_sessions_account_app_device_id
+ON system_sessions(account_app_device_id);
 
-CREATE INDEX IF NOT EXISTS idx_sessions_is_revoked
-ON sessions(is_revoked);
+CREATE INDEX IF NOT EXISTS idx_system_sessions_is_revoked
+ON system_sessions(is_revoked);
 
-CREATE INDEX IF NOT EXISTS idx_sessions_expires_at
-ON sessions(expires_at);
+CREATE INDEX IF NOT EXISTS idx_system_sessions_expires_at
+ON system_sessions(expires_at);
 
-CREATE INDEX IF NOT EXISTS idx_sessions_last_active_at
-ON sessions(last_active_at);
+CREATE INDEX IF NOT EXISTS idx_system_sessions_last_active_at
+ON system_sessions(last_active_at);
 
-CREATE INDEX IF NOT EXISTS idx_sessions_deleted_at
-ON sessions(deleted_at)
+CREATE INDEX IF NOT EXISTS idx_system_sessions_deleted_at
+ON system_sessions(deleted_at)
 WHERE deleted_at IS NOT NULL;
 
 -- =====================
 -- Trigger: auto update updated_at
 -- =====================
-DROP TRIGGER IF EXISTS update_sessions_updated_at ON sessions;
-CREATE TRIGGER update_sessions_updated_at
-BEFORE UPDATE ON sessions
+DROP TRIGGER IF EXISTS update_system_sessions_updated_at ON system_sessions;
+CREATE TRIGGER update_system_sessions_updated_at
+BEFORE UPDATE ON system_sessions
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
@@ -73,15 +73,15 @@ EXECUTE FUNCTION update_updated_at_column();
 -- +goose Down
 -- +goose StatementBegin
 
-DROP TRIGGER IF EXISTS update_sessions_updated_at ON sessions;
+DROP TRIGGER IF EXISTS update_system_sessions_updated_at ON system_sessions;
 
-DROP INDEX IF EXISTS idx_sessions_deleted_at;
-DROP INDEX IF EXISTS idx_sessions_last_active_at;
-DROP INDEX IF EXISTS idx_sessions_expires_at;
-DROP INDEX IF EXISTS idx_sessions_is_revoked;
-DROP INDEX IF EXISTS idx_sessions_account_app_device_id;
-DROP INDEX IF EXISTS idx_sessions_refresh_token_hash_unique;
+DROP INDEX IF EXISTS idx_system_sessions_deleted_at;
+DROP INDEX IF EXISTS idx_system_sessions_last_active_at;
+DROP INDEX IF EXISTS idx_system_sessions_expires_at;
+DROP INDEX IF EXISTS idx_system_sessions_is_revoked;
+DROP INDEX IF EXISTS idx_system_sessions_account_app_device_id;
+DROP INDEX IF EXISTS idx_system_sessions_refresh_token_hash_unique;
 
-DROP TABLE IF EXISTS sessions;
+DROP TABLE IF EXISTS system_sessions;
 
 -- +goose StatementEnd

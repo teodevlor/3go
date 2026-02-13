@@ -1,5 +1,5 @@
 -- name: CreateLoginHistory :one
-INSERT INTO login_histories (
+INSERT INTO app_login_histories (
     account_id,
     device_id,
     app_type,

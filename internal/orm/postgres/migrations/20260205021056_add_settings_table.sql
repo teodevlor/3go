@@ -4,7 +4,7 @@
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
--- Create enum type for settings.type
+-- Create enum type for system_settings.type
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'setting_type') THEN
@@ -17,8 +17,8 @@ BEGIN
 END;
 $$;
 
--- Create settings table
-CREATE TABLE IF NOT EXISTS settings (
+-- Create system_settings table
+CREATE TABLE IF NOT EXISTS system_settings (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 
     account_id uuid NOT NULL,
@@ -35,25 +35,25 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMPTZ,
 
-    CONSTRAINT fk_settings_account
+    CONSTRAINT fk_system_settings_account
         FOREIGN KEY (account_id)
         REFERENCES accounts(id)
         ON DELETE CASCADE
 );
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_settings_is_active
-    ON settings (is_active);
+CREATE INDEX IF NOT EXISTS idx_system_settings_is_active
+    ON system_settings (is_active);
 
-CREATE INDEX IF NOT EXISTS idx_settings_account_id
-    ON settings (account_id);
+CREATE INDEX IF NOT EXISTS idx_system_settings_account_id
+    ON system_settings (account_id);
 
-CREATE INDEX IF NOT EXISTS idx_settings_key
-    ON settings (key);
+CREATE INDEX IF NOT EXISTS idx_system_settings_key
+    ON system_settings (key);
 
-DROP TRIGGER IF EXISTS update_settings_updated_at ON settings;
-CREATE TRIGGER update_settings_updated_at
-BEFORE UPDATE ON settings
+DROP TRIGGER IF EXISTS update_system_settings_updated_at ON system_settings;
+CREATE TRIGGER update_system_settings_updated_at
+BEFORE UPDATE ON system_settings
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 
@@ -61,7 +61,7 @@ EXECUTE FUNCTION update_updated_at_column();
 
 -- +goose Down
 -- +goose StatementBegin
-DROP TRIGGER IF EXISTS update_settings_updated_at ON settings;
-DROP TABLE IF EXISTS settings;
+DROP TRIGGER IF EXISTS update_system_settings_updated_at ON system_settings;
+DROP TABLE IF EXISTS system_settings;
 DROP TYPE IF EXISTS setting_type;
 -- +goose StatementEnd

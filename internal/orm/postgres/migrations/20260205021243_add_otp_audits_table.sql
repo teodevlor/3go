@@ -1,6 +1,6 @@
 -- +goose Up
 -- +goose StatementBegin
-CREATE TABLE otp_audits (
+CREATE TABLE system_otp_audits (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
 
     otp_id uuid NOT NULL,
@@ -26,25 +26,25 @@ CREATE TABLE otp_audits (
 
     CONSTRAINT fk_otp_audit_otp
         FOREIGN KEY (otp_id)
-        REFERENCES otps(id)
+        REFERENCES system_otps(id)
         ON DELETE CASCADE
 );
 
-CREATE INDEX IF NOT EXISTS idx_otp_audits_otp_id
-ON otp_audits (otp_id);
+CREATE INDEX IF NOT EXISTS idx_system_otp_audits_otp_id
+ON system_otp_audits (otp_id);
 
-CREATE INDEX IF NOT EXISTS idx_otp_audits_created_at
-ON otp_audits (created_at);
+CREATE INDEX IF NOT EXISTS idx_system_otp_audits_created_at
+ON system_otp_audits (created_at);
 
-DROP TRIGGER IF EXISTS update_otp_audits_updated_at ON otp_audits;
-CREATE TRIGGER update_otp_audits_updated_at
-BEFORE UPDATE ON otp_audits
+DROP TRIGGER IF EXISTS update_system_otp_audits_updated_at ON system_otp_audits;
+CREATE TRIGGER update_system_otp_audits_updated_at
+BEFORE UPDATE ON system_otp_audits
 FOR EACH ROW
 EXECUTE FUNCTION update_updated_at_column();
 -- +goose StatementEnd
 
 -- +goose Down
 -- +goose StatementBegin
-DROP TRIGGER IF EXISTS update_otp_audits_updated_at ON otp_audits;
-DROP TABLE IF EXISTS otp_audits;
+DROP TRIGGER IF EXISTS update_system_otp_audits_updated_at ON system_otp_audits;
+DROP TABLE IF EXISTS system_otp_audits;
 -- +goose StatementEnd

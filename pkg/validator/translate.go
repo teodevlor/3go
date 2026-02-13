@@ -1,6 +1,8 @@
 package validator
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -9,10 +11,29 @@ import (
 )
 
 func Translate(err error) []string {
-	ve, ok := err.(validator.ValidationErrors)
-	if !ok {
-		return []string{"Invalid data"}
+	var ve validator.ValidationErrors
+	if errors.As(err, &ve) {
+		return translateValidationErrors(ve)
 	}
+
+	var ute *json.UnmarshalTypeError
+	if errors.As(err, &ute) {
+		field := strings.ToLower(ute.Field)
+		if field == "" {
+			field = "body"
+		}
+		return []string{fmt.Sprintf("%s: kiểu dữ liệu không hợp lệ", field)}
+	}
+
+	msg := err.Error()
+	if strings.Contains(strings.ToLower(msg), "unmarshal") || strings.Contains(strings.ToLower(msg), "invalid character") {
+		return []string{"Kiểu dữ liệu JSON không hợp lệ (kiểm tra định dạng từng trường)"}
+	}
+
+	return []string{"Dữ liệu không hợp lệ"}
+}
+
+func translateValidationErrors(ve validator.ValidationErrors) []string {
 
 	errMap := make(map[string]string)
 
@@ -26,16 +47,15 @@ func Translate(err error) []string {
 		}
 
 		switch tag {
-		case "min", "max":
+		case "min", "max", "gte":
 			msg = fmt.Sprintf(msg, fe.Param())
 		}
 
-		// mỗi field giữ 1 lỗi cuối cùng
 		errMap[field] = msg
 	}
 
 	if len(errMap) == 0 {
-		return []string{"Invalid data"}
+		return []string{"Dữ liệu không hợp lệ"}
 	}
 
 	keys := make([]string, 0, len(errMap))
