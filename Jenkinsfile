@@ -40,7 +40,7 @@ pipeline {
 
         stage('Deploy (Demo)') {
             steps {
-                echo "🚀 Deploying (fake deploy)..."
+                echo "Deploying (fake deploy)..."
                 sh 'echo "Deploy success"'
             }
         }
