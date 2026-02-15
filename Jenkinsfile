@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    agent { label 'gogogo-api' }
 
     environment {
         APP_NAME = "gogogo-demo"
@@ -7,41 +7,60 @@ pipeline {
 
     stages {
 
-        stage('Checkout') {
+        stage('Checkout Source') {
             steps {
                 echo "🔄 Checking out source..."
                 checkout scm
             }
         }
 
-        stage('Info') {
+        stage('Verify VPS') {
             steps {
-                echo "📦 Branch: ${env.BRANCH_NAME}"
-                sh 'echo "Commit SHA: $(git rev-parse --short HEAD)"'
-                sh 'echo "Last commit message:"'
-                sh 'git log -1 --pretty=%B'
+                echo "🖥 Verifying deploy server..."
+                sh '''
+                    echo "Current user:"
+                    whoami
+                    echo "Hostname:"
+                    hostname
+                    echo "Working directory:"
+                    pwd
+                    echo "IP address:"
+                    hostname -I
+                '''
             }
         }
 
-        stage('Build') {
+        stage('Git Info') {
+            steps {
+                echo "📦 Git information"
+                sh '''
+                    echo "Branch: ${BRANCH_NAME}"
+                    echo "Commit SHA:"
+                    git rev-parse --short HEAD
+                    echo "Last commit message:"
+                    git log -1 --pretty=%B
+                '''
+            }
+        }
+
+        stage('Build (Demo)') {
             steps {
                 echo "🏗 Building project..."
-                sh 'echo "Simulating build..."'
-                sh 'sleep 3'
-            }
-        }
-
-        stage('Test') {
-            steps {
-                echo "🧪 Running tests..."
-                sh 'echo "All tests passed ✅"'
+                sh '''
+                    echo "Simulating build..."
+                    sleep 2
+                    echo "Build completed"
+                '''
             }
         }
 
         stage('Deploy (Demo)') {
             steps {
-                echo "Deploying (fake deploy)..."
-                sh 'echo "Deploy success"'
+                echo "🚀 Deploying..."
+                sh '''
+                    echo "Deploying ${APP_NAME} on $(hostname)"
+                    echo "Deploy success ✅"
+                '''
             }
         }
     }
@@ -51,7 +70,7 @@ pipeline {
             echo "🎉 Pipeline completed successfully!"
         }
         failure {
-            echo "Pipeline failed!"
+            echo "❌ Pipeline failed!"
         }
     }
 }
