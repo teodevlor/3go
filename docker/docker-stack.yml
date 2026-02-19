@@ -5,28 +5,41 @@ services:
     image: octotechvn/gogogo-api:${VERSION}
     networks:
       - gogogo_net
+
     ports:
       - "8081:8080"
+
     volumes:
       - storage_data:/app/storage
-      - /home/jenkins/datas/srcs/gogogo:/app/config
-      
+
+    configs:
+      - source: gogogo_config
+        target: /app/config/dev.yml
+
     stop_grace_period: 30s
 
     environment:
       DB_HOST: gogogo_postgres
+      DB_PORT: 5432
       DB_USER: user_postgres
       DB_PASSWORD: password_postgres
       DB_NAME: gogogo
 
     deploy:
       replicas: 4
+
+      placement:
+        preferences:
+          - spread: node.hostname
+
       update_config:
         parallelism: 1
         delay: 5s
         order: start-first
+
       restart_policy:
         condition: any
+
       resources:
         limits:
           cpus: "1.0"
@@ -40,4 +53,8 @@ volumes:
 
 networks:
   gogogo_net:
+    external: true
+
+configs:
+  gogogo_config:
     external: true
