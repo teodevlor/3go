@@ -18,7 +18,7 @@ RUN apk add --no-cache ca-certificates
 
 WORKDIR /app
 
-COPY --from=builder /gogogo-api/app .
+COPY --from=builder /gogogo-api/config ./config
 
 EXPOSE 8080
 

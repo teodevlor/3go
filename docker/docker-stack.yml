@@ -2,11 +2,11 @@ version: "3.9"
 
 services:
   gogogo-api:
-    image: myorg/gogogo-api:${VERSION}
+    image: octotechvn/gogogo-api:${VERSION}
     networks:
       - gogogo_net
     ports:
-      - "80:8080"
+      - "8081:8080"
     volumes:
       - config_data:/app/config
       - storage_data:/app/storage
