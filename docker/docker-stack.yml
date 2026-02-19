@@ -39,6 +39,10 @@ services:
       - gogogo_net
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: gogogo
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     deploy:
       placement:
         constraints:
