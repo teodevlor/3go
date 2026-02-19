@@ -1,0 +1,55 @@
+version: "3.9"
+
+services:
+  gogogo-api:
+    image: myorg/gogogo-api:${VERSION}
+    networks:
+      - gogogo_net
+    ports:
+      - "80:8080"
+    volumes:
+      - config_data:/app/config
+      - storage_data:/app/storage
+    deploy:
+      replicas: 4
+      update_config:
+        parallelism: 1
+        delay: 5s
+        order: start-first
+      restart_policy:
+        condition: any
+      stop_grace_period: 30s
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+    environment:
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: gogogo
+
+  postgres:
+    image: postgis/postgis:15-3.4
+    networks:
+      - gogogo_net
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    deploy:
+      placement:
+        constraints:
+          - node.role == worker
+      restart_policy:
+        condition: any
+
+volumes:
+  postgres_data:
+  config_data:
+  storage_data:
+
+networks:
+  gogogo_net:
+    external: true
