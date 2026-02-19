@@ -2,7 +2,7 @@ server:
   port: 8080
   mode: "dev"
 db_postgre:
-  host: gogogo_postgres
+  host: postgres
   port: 5432
   user: postgres
   password: postgres
