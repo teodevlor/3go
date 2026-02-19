@@ -64,18 +64,18 @@ def deployStack(String commit) {
         export VERSION=${commit}
 
         docker stack deploy \
-            -c docker-stack.yml \
+            -c docker/docker-stack.yml \
             gogogo
 
         echo "📦 Current Stack Services:"
         docker stack services gogogo
-
         echo "📊 Stack Tasks:"
         docker stack ps gogogo
 
         echo "✅ Stack deployed successfully!"
     """
 }
+
 
 
 def rollbackStack(String commit) {

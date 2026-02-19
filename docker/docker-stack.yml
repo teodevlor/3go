@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   gogogo-api:
     image: octotechvn/gogogo-api:${VERSION}
@@ -10,6 +8,15 @@ services:
     volumes:
       - config_data:/app/config
       - storage_data:/app/storage
+
+    stop_grace_period: 30s
+
+    environment:
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      DB_NAME: gogogo
+
     deploy:
       replicas: 4
       update_config:
@@ -18,7 +25,6 @@ services:
         order: start-first
       restart_policy:
         condition: any
-      stop_grace_period: 30s
       resources:
         limits:
           cpus: "1.0"
@@ -26,11 +32,6 @@ services:
         reservations:
           cpus: "0.5"
           memory: 256M
-    environment:
-      DB_HOST: postgres
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: gogogo
 
   postgres:
     image: postgis/postgis:15-3.4
