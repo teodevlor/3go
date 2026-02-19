@@ -19,7 +19,7 @@ services:
     stop_grace_period: 30s
 
     environment:
-      DB_HOST: gogogo_postgres
+      DB_HOST: postgres
       DB_PORT: 5432
       DB_USER: user_postgres
       DB_PASSWORD: password_postgres
@@ -48,12 +48,34 @@ services:
           cpus: "0.5"
           memory: 256M
 
+  postgres:
+    image: postgis/postgis:15-3.4
+    networks:
+      - gogogo_net
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    environment:
+      POSTGRES_DB: gogogo
+      POSTGRES_USER: user_postgres
+      POSTGRES_PASSWORD: password_postgres
+
+    deploy:
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: any
+
 volumes:
   storage_data:
+  postgres_data:
 
 networks:
   gogogo_net:
-    external: true
+    driver: overlay
+    attachable: true
 
 configs:
   gogogo_config:
