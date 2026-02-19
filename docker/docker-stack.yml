@@ -6,7 +6,6 @@ services:
     ports:
       - "8081:8080"
     volumes:
-      - config_data:/app/config
       - storage_data:/app/storage
 
     stop_grace_period: 30s
@@ -52,7 +51,6 @@ services:
 
 volumes:
   postgres_data:
-  config_data:
   storage_data:
 
 networks:
