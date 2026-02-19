@@ -11,7 +11,7 @@ services:
     stop_grace_period: 30s
 
     environment:
-      DB_HOST: postgres
+      DB_HOST: gogogo_postgres
       DB_USER: postgres
       DB_PASSWORD: postgres
       DB_NAME: gogogo
