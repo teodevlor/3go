@@ -4,8 +4,8 @@ server:
 db_postgre:
   host: gogogo_postgres
   port: 5432
-  user: postgres
-  password: postgres
+  user: user_postgres
+  password: password_postgres
   dbname: gogogo
   maxIdleConns: 10
   maxOpenConns: 100

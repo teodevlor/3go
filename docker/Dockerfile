@@ -22,9 +22,6 @@ WORKDIR /app
 # copy binary
 COPY --from=builder /gogogo-api/app .
 
-# copy config
-COPY --from=builder /gogogo-api/config ./config
-
 EXPOSE 8080
 
 CMD ["./app"]

@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   gogogo-api:
     image: octotechvn/gogogo-api:${VERSION}
@@ -7,13 +9,14 @@ services:
       - "8081:8080"
     volumes:
       - storage_data:/app/storage
-
+      - /home/jenkins/datas/srcs/gogogo:/app/config
+      
     stop_grace_period: 30s
 
     environment:
       DB_HOST: gogogo_postgres
-      DB_USER: postgres
-      DB_PASSWORD: postgres
+      DB_USER: user_postgres
+      DB_PASSWORD: password_postgres
       DB_NAME: gogogo
 
     deploy:
@@ -32,25 +35,7 @@ services:
           cpus: "0.5"
           memory: 256M
 
-  postgres:
-    image: postgis/postgis:15-3.4
-    networks:
-      - gogogo_net
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    environment:
-      POSTGRES_DB: gogogo
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-    deploy:
-      placement:
-        constraints:
-          - node.role == worker
-      restart_policy:
-        condition: any
-
 volumes:
-  postgres_data:
   storage_data:
 
 networks:
