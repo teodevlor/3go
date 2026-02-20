@@ -24,7 +24,7 @@ func NewApiV1(
 	apiV1 := router.Group("api/v1")
 	{
 		apiV1.GET("/health", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{"message": "OK"})
+			c.JSON(http.StatusOK, gin.H{"message": "OK bay giờ test commit"})
 		})
 
 		// modules
