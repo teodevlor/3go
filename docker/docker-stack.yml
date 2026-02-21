@@ -5,41 +5,25 @@ services:
     image: octotechvn/gogogo-api:${VERSION}
     networks:
       - gogogo_net
-
     ports:
       - "8081:8080"
-
     volumes:
       - storage_data:/app/storage
-
     configs:
       - source: gogogo_config
         target: /app/config/dev.yml
-
     stop_grace_period: 30s
-
-    environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: user_postgres
-      DB_PASSWORD: password_postgres
-      DB_NAME: gogogo
-
     deploy:
       replicas: 4
-
       placement:
         preferences:
           - spread: node.hostname
-
       update_config:
         parallelism: 1
         delay: 5s
         order: start-first
-
       restart_policy:
         condition: any
-
       resources:
         limits:
           cpus: "1.0"
@@ -47,36 +31,29 @@ services:
         reservations:
           cpus: "0.5"
           memory: 256M
-
   postgres:
     image: postgis/postgis:15-3.4
     networks:
       - gogogo_net
-
     volumes:
       - postgres_data:/var/lib/postgresql/data
-
     environment:
       POSTGRES_DB: gogogo
       POSTGRES_USER: user_postgres
       POSTGRES_PASSWORD: password_postgres
-
     deploy:
       placement:
         constraints:
           - node.role == manager
       restart_policy:
         condition: any
-
 volumes:
   storage_data:
   postgres_data:
-
 networks:
   gogogo_net:
     driver: overlay
     attachable: true
-
 configs:
   gogogo_config:
     external: true
