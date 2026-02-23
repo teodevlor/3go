@@ -12,6 +12,64 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const countSystemAdmins = `-- name: CountSystemAdmins :one
+SELECT COUNT(*) FROM system_admins
+WHERE ($1::text = '' OR email ILIKE '%' || $1 || '%' OR full_name ILIKE '%' || $1 || '%')
+`
+
+func (q *Queries) CountSystemAdmins(ctx context.Context, dollar_1 string) (int64, error) {
+	row := q.db.QueryRow(ctx, countSystemAdmins, dollar_1)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const createSystemAdmin = `-- name: CreateSystemAdmin :one
+INSERT INTO system_admins (email, password_hash, full_name, department, is_active)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, email, password_hash, full_name, department, is_active, last_login_at, created_at, updated_at
+`
+
+type CreateSystemAdminParams struct {
+	Email        string      `json:"email"`
+	PasswordHash string      `json:"password_hash"`
+	FullName     pgtype.Text `json:"full_name"`
+	Department   string      `json:"department"`
+	IsActive     pgtype.Bool `json:"is_active"`
+}
+
+func (q *Queries) CreateSystemAdmin(ctx context.Context, arg CreateSystemAdminParams) (SystemAdmin, error) {
+	row := q.db.QueryRow(ctx, createSystemAdmin,
+		arg.Email,
+		arg.PasswordHash,
+		arg.FullName,
+		arg.Department,
+		arg.IsActive,
+	)
+	var i SystemAdmin
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.FullName,
+		&i.Department,
+		&i.IsActive,
+		&i.LastLoginAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const deleteSystemAdmin = `-- name: DeleteSystemAdmin :exec
+DELETE FROM system_admins WHERE id = $1
+`
+
+func (q *Queries) DeleteSystemAdmin(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteSystemAdmin, id)
+	return err
+}
+
 const getSystemAdminByEmail = `-- name: GetSystemAdminByEmail :one
 SELECT id, email, password_hash, full_name, department, is_active, last_login_at, created_at, updated_at FROM system_admins
 WHERE email = $1 LIMIT 1
@@ -41,6 +99,87 @@ WHERE id = $1 LIMIT 1
 
 func (q *Queries) GetSystemAdminByID(ctx context.Context, id uuid.UUID) (SystemAdmin, error) {
 	row := q.db.QueryRow(ctx, getSystemAdminByID, id)
+	var i SystemAdmin
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.FullName,
+		&i.Department,
+		&i.IsActive,
+		&i.LastLoginAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const listSystemAdmins = `-- name: ListSystemAdmins :many
+SELECT id, email, password_hash, full_name, department, is_active, last_login_at, created_at, updated_at FROM system_admins
+WHERE ($1::text = '' OR email ILIKE '%' || $1 || '%' OR full_name ILIKE '%' || $1 || '%')
+ORDER BY created_at DESC
+LIMIT $2 OFFSET $3
+`
+
+type ListSystemAdminsParams struct {
+	Column1 string `json:"column_1"`
+	Limit   int32  `json:"limit"`
+	Offset  int32  `json:"offset"`
+}
+
+func (q *Queries) ListSystemAdmins(ctx context.Context, arg ListSystemAdminsParams) ([]SystemAdmin, error) {
+	rows, err := q.db.Query(ctx, listSystemAdmins, arg.Column1, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SystemAdmin{}
+	for rows.Next() {
+		var i SystemAdmin
+		if err := rows.Scan(
+			&i.ID,
+			&i.Email,
+			&i.PasswordHash,
+			&i.FullName,
+			&i.Department,
+			&i.IsActive,
+			&i.LastLoginAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateSystemAdmin = `-- name: UpdateSystemAdmin :one
+UPDATE system_admins
+SET email = $2, full_name = $3, department = $4, is_active = $5, updated_at = CURRENT_TIMESTAMP
+WHERE id = $1
+RETURNING id, email, password_hash, full_name, department, is_active, last_login_at, created_at, updated_at
+`
+
+type UpdateSystemAdminParams struct {
+	ID         uuid.UUID   `json:"id"`
+	Email      string      `json:"email"`
+	FullName   pgtype.Text `json:"full_name"`
+	Department string      `json:"department"`
+	IsActive   pgtype.Bool `json:"is_active"`
+}
+
+func (q *Queries) UpdateSystemAdmin(ctx context.Context, arg UpdateSystemAdminParams) (SystemAdmin, error) {
+	row := q.db.QueryRow(ctx, updateSystemAdmin,
+		arg.ID,
+		arg.Email,
+		arg.FullName,
+		arg.Department,
+		arg.IsActive,
+	)
 	var i SystemAdmin
 	err := row.Scan(
 		&i.ID,

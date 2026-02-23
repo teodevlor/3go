@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"go-structure/global"
-	common "go-structure/internal/common"
+	"go-structure/internal/constants"
 	dto_common "go-structure/internal/dto/common"
 	dto "go-structure/internal/dto/web_system"
 	"go-structure/internal/helper/database"
@@ -110,14 +110,14 @@ func (u *zoneUsecase) ListZones(ctx context.Context, page int, limit int, search
 		return &dto.ListZonesResponseDto{Items: nil, Pagination: dto_common.PaginationMeta{Page: page, Limit: limit, Total: 0}}, nil
 	}
 	if page < 1 {
-		page = common.DefaultPage
+		page = constants.DefaultPage
 	}
-	if limit < 1 || limit > common.MaxLimit {
-		limit = common.DefaultLimit
+	if limit < 1 || limit > constants.MaxLimit {
+		limit = constants.DefaultLimit
 	}
 	search = strings.TrimSpace(search)
-	if len(search) > common.MaxSearchLen {
-		search = search[:common.MaxSearchLen]
+	if len(search) > constants.MaxSearchLen {
+		search = search[:constants.MaxSearchLen]
 	}
 	offset := int32((page - 1) * limit)
 	limit32 := int32(limit)

@@ -24,3 +24,5 @@ sql:
             go_type: "string"
           - column: "system_settings.type"
             go_type: "string"
+          - column: "system_roles.description"
+            go_type: "string"

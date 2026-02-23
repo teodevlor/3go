@@ -6,7 +6,7 @@ import (
 	"errors"
 	"time"
 
-	"go-structure/internal/common"
+	"go-structure/internal/constants"
 	dto_common "go-structure/internal/dto/common"
 	dto "go-structure/internal/dto/web_system"
 	"go-structure/internal/helper/database"
@@ -90,10 +90,10 @@ func (u *sidebarUsecase) GetSidebar(ctx context.Context, id uuid.UUID) (*dto.Sid
 
 func (u *sidebarUsecase) ListSidebars(ctx context.Context, contextFilter string, page, limit int) (*dto.ListSidebarsResponseDto, error) {
 	if page < 1 {
-		page = common.DefaultPage
+		page = constants.DefaultPage
 	}
-	if limit < 1 || limit > common.MaxLimit {
-		limit = common.DefaultLimit
+	if limit < 1 || limit > constants.MaxLimit {
+		limit = constants.DefaultLimit
 	}
 	offset := int32((page - 1) * limit)
 	limit32 := int32(limit)

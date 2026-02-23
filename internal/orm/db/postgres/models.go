@@ -92,6 +92,13 @@ type SystemAdminRefreshToken struct {
 	DeletedAt        pgtype.Timestamptz `json:"deleted_at"`
 }
 
+type SystemAdminRole struct {
+	AdminID    uuid.UUID          `json:"admin_id"`
+	RoleID     uuid.UUID          `json:"role_id"`
+	AssignedAt pgtype.Timestamptz `json:"assigned_at"`
+	AssignedBy pgtype.UUID        `json:"assigned_by"`
+}
+
 type SystemDistancePricingRule struct {
 	ID         uuid.UUID          `json:"id"`
 	ServiceID  uuid.UUID          `json:"service_id"`
@@ -158,6 +165,32 @@ type SystemPackageSizePricing struct {
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type SystemPermission struct {
+	ID          uuid.UUID          `json:"id"`
+	Resource    string             `json:"resource"`
+	Action      string             `json:"action"`
+	Code        pgtype.Text        `json:"code"`
+	Name        string             `json:"name"`
+	Description pgtype.Text        `json:"description"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type SystemRole struct {
+	ID          uuid.UUID          `json:"id"`
+	Code        string             `json:"code"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	IsActive    bool               `json:"is_active"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type SystemRolePermission struct {
+	RoleID       uuid.UUID `json:"role_id"`
+	PermissionID uuid.UUID `json:"permission_id"`
 }
 
 type SystemService struct {

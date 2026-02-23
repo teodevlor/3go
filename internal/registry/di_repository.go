@@ -29,6 +29,10 @@ const (
 	SystemAdminRepoDIName                = "system_admin_repo_di"
 	SystemLoginHistoryRepoDIName         = "system_login_history_repo_di"
 	SystemAdminRefreshTokenRepoDIName    = "system_admin_refresh_token_repo_di"
+	RoleRepoDIName                       = "role_repo_di"
+	SystemAdminRoleRepoDIName            = "system_admin_role_repo_di"
+	PermissionRepoDIName                 = "permission_repo_di"
+	RolePermissionRepoDIName             = "role_permission_repo_di"
 )
 
 func buildRepositories() error {
@@ -203,6 +207,42 @@ func buildRepositories() error {
 		},
 	}
 
+	roleDef := di.Def{
+		Name:  RoleRepoDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			pool := ctn.Get(PostgresPoolDIName).(*pgxpool.Pool)
+			return setting_repo.NewRoleRepository(pool), nil
+		},
+	}
+
+	systemAdminRoleDef := di.Def{
+		Name:  SystemAdminRoleRepoDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			pool := ctn.Get(PostgresPoolDIName).(*pgxpool.Pool)
+			return setting_repo.NewSystemAdminRoleRepository(pool), nil
+		},
+	}
+
+	permissionDef := di.Def{
+		Name:  PermissionRepoDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			pool := ctn.Get(PostgresPoolDIName).(*pgxpool.Pool)
+			return setting_repo.NewPermissionRepository(pool), nil
+		},
+	}
+
+	rolePermissionDef := di.Def{
+		Name:  RolePermissionRepoDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			pool := ctn.Get(PostgresPoolDIName).(*pgxpool.Pool)
+			return setting_repo.NewRolePermissionRepository(pool), nil
+		},
+	}
+
 	return builder.Add(
 		userProfileDef,
 		accountDef,
@@ -223,5 +263,9 @@ func buildRepositories() error {
 		systemAdminDef,
 		systemLoginHistoryDef,
 		systemAdminRefreshTokenDef,
+		roleDef,
+		systemAdminRoleDef,
+		permissionDef,
+		rolePermissionDef,
 	)
 }

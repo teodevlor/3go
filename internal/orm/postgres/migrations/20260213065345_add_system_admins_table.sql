@@ -27,7 +27,8 @@ CREATE TABLE IF NOT EXISTS system_admins (
     last_login_at TIMESTAMPTZ,
     
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    deleted_at TIMESTAMPTZ
 );
 
 -- Indexes
@@ -39,6 +40,10 @@ CREATE INDEX IF NOT EXISTS idx_system_admins_is_active
 
 CREATE INDEX IF NOT EXISTS idx_system_admins_department
     ON system_admins (department);
+
+CREATE INDEX IF NOT EXISTS idx_system_admins_deleted_at
+    ON system_admins (deleted_at)
+    WHERE deleted_at IS NULL;
 
 -- Trigger: auto update updated_at
 DROP TRIGGER IF EXISTS update_system_admins_updated_at ON system_admins;
@@ -54,6 +59,7 @@ EXECUTE FUNCTION update_updated_at_column();
 
 DROP TRIGGER IF EXISTS update_system_admins_updated_at ON system_admins;
 
+DROP INDEX IF EXISTS idx_system_admins_deleted_at;
 DROP INDEX IF EXISTS idx_system_admins_department;
 DROP INDEX IF EXISTS idx_system_admins_is_active;
 DROP INDEX IF EXISTS idx_system_admins_email;

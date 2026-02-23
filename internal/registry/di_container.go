@@ -11,6 +11,7 @@ import (
 	controller "go-structure/internal/controller/app_user"
 	websystem_controller "go-structure/internal/controller/web_system"
 	"go-structure/internal/helper/database"
+	websystem_usecase "go-structure/internal/usecase/web_system"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -152,6 +153,7 @@ func buildApis() error {
 
 			userProfileController := ctn.Get(UserProfileControllerDIName).(controller.UserProfileController)
 			otpController := ctn.Get(OTPControllerDIName).(otpcontroller.OTPController)
+			authAdminUsecase := ctn.Get(AuthAdminUsecaseDIName).(websystem_usecase.IAuthAdminUsecase)
 			authAdminController := ctn.Get(AuthAdminControllerDIName).(websystem_controller.AuthAdminController)
 			zoneController := ctn.Get(ZoneControllerDIName).(websystem_controller.ZoneController)
 			sidebarController := ctn.Get(SidebarControllerDIName).(websystem_controller.SidebarController)
@@ -159,11 +161,16 @@ func buildApis() error {
 			distancePricingRuleController := ctn.Get(DistancePricingRuleControllerDIName).(websystem_controller.DistancePricingRuleController)
 			surchargeRuleController := ctn.Get(SurchargeRuleControllerDIName).(websystem_controller.SurchargeRuleController)
 			packageSizePricingController := ctn.Get(PackageSizePricingControllerDIName).(websystem_controller.PackageSizePricingController)
+			roleController := ctn.Get(RoleControllerDIName).(websystem_controller.RoleController)
+			adminController := ctn.Get(AdminControllerDIName).(websystem_controller.AdminController)
+			permissionController := ctn.Get(PermissionControllerDIName).(websystem_controller.PermissionController)
+			storageController := ctn.Get(StorageControllerDIName).(otpcontroller.StorageController)
 
 			v1.NewApiV1(
 				router,
 				userProfileController,
 				otpController,
+				authAdminUsecase,
 				authAdminController,
 				zoneController,
 				sidebarController,
@@ -171,6 +178,10 @@ func buildApis() error {
 				distancePricingRuleController,
 				surchargeRuleController,
 				packageSizePricingController,
+				roleController,
+				adminController,
+				permissionController,
+				storageController,
 			)
 			return router, nil
 		},

@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"go-structure/config"
 	otpcontroller "go-structure/internal/controller"
 	controller "go-structure/internal/controller/app_user"
 	websystem_controller "go-structure/internal/controller/web_system"
@@ -14,6 +15,7 @@ import (
 const (
 	UserProfileControllerDIName         = "user_profile_controller_di"
 	OTPControllerDIName                 = "otp_controller_di"
+	StorageControllerDIName             = "storage_controller_di"
 	ZoneControllerDIName                = "zone_controller_di"
 	SidebarControllerDIName             = "sidebar_controller_di"
 	ServiceControllerDIName             = "service_controller_di"
@@ -21,6 +23,9 @@ const (
 	SurchargeRuleControllerDIName       = "surcharge_rule_controller_di"
 	PackageSizePricingControllerDIName  = "package_size_pricing_controller_di"
 	AuthAdminControllerDIName           = "auth_admin_controller_di"
+	RoleControllerDIName                = "role_controller_di"
+	AdminControllerDIName               = "admin_controller_di"
+	PermissionControllerDIName          = "permission_controller_di"
 )
 
 func buildControllers() error {
@@ -39,6 +44,16 @@ func buildControllers() error {
 		Build: func(ctn di.Container) (interface{}, error) {
 			uc := ctn.Get(OTPUsecaseDIName).(usecase_pkg.IOTPUsecase)
 			return otpcontroller.NewOTPController(uc), nil
+		},
+	}
+
+	storageDef := di.Def{
+		Name:  StorageControllerDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			uc := ctn.Get(StorageUsecaseDIName).(usecase_pkg.IStorageUsecase)
+			cfg := ctn.Get(ConfigDIName).(*config.Config)
+			return otpcontroller.NewStorageController(uc, cfg.Storage), nil
 		},
 	}
 
@@ -105,9 +120,37 @@ func buildControllers() error {
 		},
 	}
 
+	roleDef := di.Def{
+		Name:  RoleControllerDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			uc := ctn.Get(RoleUsecaseDIName).(websystem_usecase.IRoleUsecase)
+			return websystem_controller.NewRoleController(uc), nil
+		},
+	}
+
+	adminDef := di.Def{
+		Name:  AdminControllerDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			uc := ctn.Get(AdminUsecaseDIName).(websystem_usecase.IAdminUsecase)
+			return websystem_controller.NewAdminController(uc), nil
+		},
+	}
+
+	permissionDef := di.Def{
+		Name:  PermissionControllerDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			uc := ctn.Get(PermissionUsecaseDIName).(websystem_usecase.IPermissionUsecase)
+			return websystem_controller.NewPermissionController(uc), nil
+		},
+	}
+
 	return builder.Add(
 		userProfileDef,
 		otpDef,
+		storageDef,
 		zoneDef,
 		sidebarDef,
 		serviceDef,
@@ -115,5 +158,8 @@ func buildControllers() error {
 		surchargeRuleDef,
 		packageSizePricingDef,
 		authAdminDef,
+		roleDef,
+		adminDef,
+		permissionDef,
 	)
 }

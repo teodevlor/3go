@@ -2,6 +2,7 @@ package registry
 
 import (
 	"go-structure/internal/adapter"
+	"go-structure/internal/adapter/storage"
 	"go-structure/internal/helper/database"
 	account_repo "go-structure/internal/repository"
 	user_profile_repo "go-structure/internal/repository/app_user"
@@ -18,6 +19,7 @@ const (
 	NotifyUsecaseDIName              = "notify_usecase_di"
 	SettingUsecaseDIName             = "setting_usecase_di"
 	OTPUsecaseDIName                 = "otp_usecase_di"
+	StorageUsecaseDIName             = "storage_usecase_di"
 	ZoneUsecaseDIName                = "zone_usecase_di"
 	SidebarUsecaseDIName             = "sidebar_usecase_di"
 	ServiceUsecaseDIName             = "service_usecase_di"
@@ -26,6 +28,9 @@ const (
 	SurchargeRuleUsecaseDIName       = "surcharge_rule_usecase_di"
 	PackageSizePricingUsecaseDIName  = "package_size_pricing_usecase_di"
 	AuthAdminUsecaseDIName           = "auth_admin_usecase_di"
+	RoleUsecaseDIName                = "role_usecase_di"
+	AdminUsecaseDIName               = "admin_usecase_di"
+	PermissionUsecaseDIName          = "permission_usecase_di"
 )
 
 func buildUsecases() error {
@@ -187,8 +192,54 @@ func buildUsecases() error {
 			adminRepo := ctn.Get(SystemAdminRepoDIName).(settingRepository.ISystemAdminRepository)
 			loginHistoryRepo := ctn.Get(SystemLoginHistoryRepoDIName).(settingRepository.ISystemLoginHistoryRepository)
 			refreshTokenRepo := ctn.Get(SystemAdminRefreshTokenRepoDIName).(settingRepository.ISystemAdminRefreshTokenRepository)
+			adminRoleRepo := ctn.Get(SystemAdminRoleRepoDIName).(settingRepository.ISystemAdminRoleRepository)
+			roleRepo := ctn.Get(RoleRepoDIName).(settingRepository.IRoleRepository)
+			rolePermissionRepo := ctn.Get(RolePermissionRepoDIName).(settingRepository.IRolePermissionRepository)
+			permissionRepo := ctn.Get(PermissionRepoDIName).(settingRepository.IPermissionRepository)
 			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
-			return websystem_usecase.NewAuthAdminUsecase(adminRepo, loginHistoryRepo, refreshTokenRepo, txManager), nil
+			return websystem_usecase.NewAuthAdminUsecase(adminRepo, loginHistoryRepo, refreshTokenRepo, adminRoleRepo, roleRepo, rolePermissionRepo, permissionRepo, txManager), nil
+		},
+	}
+
+	roleDef := di.Def{
+		Name:  RoleUsecaseDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			roleRepo := ctn.Get(RoleRepoDIName).(settingRepository.IRoleRepository)
+			rolePermissionRepo := ctn.Get(RolePermissionRepoDIName).(settingRepository.IRolePermissionRepository)
+			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
+			return websystem_usecase.NewRoleUsecase(roleRepo, rolePermissionRepo, txManager), nil
+		},
+	}
+
+	adminDef := di.Def{
+		Name:  AdminUsecaseDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			adminRepo := ctn.Get(SystemAdminRepoDIName).(settingRepository.ISystemAdminRepository)
+			adminRoleRepo := ctn.Get(SystemAdminRoleRepoDIName).(settingRepository.ISystemAdminRoleRepository)
+			roleRepo := ctn.Get(RoleRepoDIName).(settingRepository.IRoleRepository)
+			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
+			return websystem_usecase.NewAdminUsecase(adminRepo, adminRoleRepo, roleRepo, txManager), nil
+		},
+	}
+
+	permissionDef := di.Def{
+		Name:  PermissionUsecaseDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			permissionRepo := ctn.Get(PermissionRepoDIName).(settingRepository.IPermissionRepository)
+			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
+			return websystem_usecase.NewPermissionUsecase(permissionRepo, txManager), nil
+		},
+	}
+
+	storageDef := di.Def{
+		Name:  StorageUsecaseDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			storageAdapter := ctn.Get(StorageAdapterDIName).(storage.IStorageAdapter)
+			return usecase_pkg.NewStorageUsecase(storageAdapter), nil
 		},
 	}
 
@@ -205,5 +256,9 @@ func buildUsecases() error {
 		surchargeRuleDef,
 		packageSizePricingDef,
 		authAdminDef,
+		roleDef,
+		adminDef,
+		permissionDef,
+		storageDef,
 	)
 }

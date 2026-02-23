@@ -15,6 +15,7 @@ type (
 		Logger          Logger          `mapstructure:"logger"`
 		TelegramConfig  TelegramConfig  `mapstructure:"telegram"`
 		JwtConfig       JwtConfig       `mapstructure:"jwt"`
+		Storage         Storage         `mapstructure:"storage"`
 	}
 
 	Server struct {
@@ -77,6 +78,15 @@ type (
 	JwtConfig struct {
 		Secret         string `mapstructure:"secret"`
 		AccessTokenTtl string `mapstructure:"access_token_ttl"`
+	}
+
+	Storage struct {
+		Endpoint      string `mapstructure:"endpoint"`
+		AccessKey     string `mapstructure:"access_key"`
+		SecretKey     string `mapstructure:"secret_key"`
+		BucketPublic  string `mapstructure:"bucket_public"`
+		BucketPrivate string `mapstructure:"bucket_private"`
+		Provider      string `mapstructure:"provider"`
 	}
 )
 

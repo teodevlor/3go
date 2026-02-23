@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"go-structure/internal/common"
+	"go-structure/internal/constants"
 	"go-structure/internal/dto"
 	"go-structure/internal/usecase"
 	"go-structure/pkg/validator"
@@ -43,7 +44,7 @@ func (ctl *otpController) ResendOTP(c *gin.Context) *common.ResponseData {
 			errMsg := err.Error()
 			var withRetry *common.ErrorWithRetryAfter
 			if errors.As(err, &withRetry) && withRetry.RetryAfterSeconds > 0 {
-				errMsg = fmt.Sprintf("%s%s", errMsg, fmt.Sprintf(common.BaseMessageResendOTPMaxExceededRetryAfter, withRetry.RetryAfterSeconds))
+				errMsg = fmt.Sprintf("%s%s", errMsg, fmt.Sprintf(constants.BaseMessageResendOTPMaxExceededRetryAfter, withRetry.RetryAfterSeconds))
 			}
 			return common.ErrorResponse(common.StatusTooManyRequests, []string{errMsg})
 		}
@@ -51,6 +52,6 @@ func (ctl *otpController) ResendOTP(c *gin.Context) *common.ResponseData {
 	}
 
 	return common.SuccessResponse(common.StatusOK, dto.OTPResendResponseDto{
-		UserMessage: common.AppUserMessageResendOTPSuccess,
+		UserMessage: constants.AppUserMessageResendOTPSuccess,
 	})
 }

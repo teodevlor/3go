@@ -1,8 +1,11 @@
 package registry
 
 import (
+	"strings"
+
 	"go-structure/config"
 	"go-structure/internal/adapter"
+	"go-structure/internal/adapter/storage"
 	"go-structure/pkg/telegram"
 
 	"github.com/sarulabs/di"
@@ -10,10 +13,11 @@ import (
 
 const (
 	TelegramAdapterDIName = "telegram_adapter_di"
+	StorageAdapterDIName  = "storage_adapter_di"
 )
 
 func buildAdapters() error {
-	def := di.Def{
+	telegramDef := di.Def{
 		Name:  TelegramAdapterDIName,
 		Scope: di.App,
 		Build: func(ctn di.Container) (interface{}, error) {
@@ -22,5 +26,30 @@ func buildAdapters() error {
 			return adapter.NewTelegramAdapter(client), nil
 		},
 	}
-	return builder.Add(def)
+	storageDef := di.Def{
+		Name:  StorageAdapterDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			cfg := ctn.Get(ConfigDIName).(*config.Config)
+			s := cfg.Storage
+			if strings.EqualFold(strings.TrimSpace(s.Provider), "minio") {
+				minioCfg := storage.MinIOConfig{
+					Endpoint:      s.Endpoint,
+					AccessKey:     s.AccessKey,
+					SecretKey:     s.SecretKey,
+					BucketPublic:  s.BucketPublic,
+					BucketPrivate: s.BucketPrivate,
+				}
+				return storage.NewMinIOAdapter(minioCfg)
+			}
+			s3cfg := storage.S3Config{
+				Endpoint:  s.Endpoint,
+				AccessKey: s.AccessKey,
+				SecretKey: s.SecretKey,
+				Provider:  s.Provider,
+			}
+			return storage.NewS3Adapter(s3cfg)
+		},
+	}
+	return builder.Add(telegramDef, storageDef)
 }

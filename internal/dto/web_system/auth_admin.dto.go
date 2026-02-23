@@ -14,12 +14,26 @@ type (
 		Admin        AdminProfileResponseDto `json:"admin"`
 	}
 
+	AdminRoleSimpleDto struct {
+		ID   string `json:"id"`
+		Name string `json:"name"`
+	}
+
+	// AdminPermissionSimpleDto permission trong response login (chỉ id, code, name).
+	AdminPermissionSimpleDto struct {
+		ID   string `json:"id"`
+		Code string `json:"code"`
+		Name string `json:"name"`
+	}
+
 	AdminProfileResponseDto struct {
-		ID         uuid.UUID `json:"id" example:"123e4567-e89b-12d3-a456-426614174000"`
-		Email      string    `json:"email" example:"admin@example.com"`
-		FullName   string    `json:"full_name" example:"Nguyễn Văn A"`
-		Department string    `json:"department" example:"admin"`
-		IsActive   bool      `json:"is_active" example:"true"`
+		ID          uuid.UUID                   `json:"id" example:"123e4567-e89b-12d3-a456-426614174000"`
+		Email       string                      `json:"email" example:"admin@example.com"`
+		FullName    string                      `json:"full_name" example:"Nguyễn Văn A"`
+		Department  string                      `json:"department" example:"admin"`
+		IsActive    bool                        `json:"is_active" example:"true"`
+		Roles       []AdminRoleSimpleDto        `json:"roles"`
+		Permissions []AdminPermissionSimpleDto  `json:"permissions"`
 	}
 
 	AdminRefreshTokenRequestDto struct {

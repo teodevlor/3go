@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"go-structure/internal/common"
+	"go-structure/internal/constants"
 	"go-structure/internal/dto"
 	"go-structure/internal/helper/database"
 	"go-structure/internal/repository"
@@ -220,7 +221,7 @@ func (u *otpUsecase) ensureResendCooldown(ctx context.Context, target, purpose s
 	elapsed := time.Since(*lastCreated)
 	if int32(elapsed.Seconds()) < cfg.TimeOutResent {
 		waitSec := cfg.TimeOutResent - int32(elapsed.Seconds())
-		return fmt.Errorf("%w"+common.BaseMessageResendOTPTooSoonWaitSeconds, common.ErrResendTooSoon, waitSec)
+		return fmt.Errorf("%w"+constants.BaseMessageResendOTPTooSoonWaitSeconds, common.ErrResendTooSoon, waitSec)
 	}
 	return nil
 }

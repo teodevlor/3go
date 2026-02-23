@@ -3,6 +3,7 @@ package appuser
 import (
 	"errors"
 	"go-structure/internal/common"
+	"go-structure/internal/constants"
 	"go-structure/internal/controller"
 	dto "go-structure/internal/dto/app_user"
 	usecase "go-structure/internal/usecase/app_user"
@@ -154,7 +155,7 @@ func (ctl *userProfileController) Logout(c *gin.Context) *common.ResponseData {
 	}
 
 	return common.SuccessResponse(common.StatusOK, dto.LogoutResponseDto{
-		UserMessage: common.BaseMessageLogoutSuccess,
+		UserMessage: constants.BaseMessageLogoutSuccess,
 	})
 }
 

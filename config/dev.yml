@@ -4,8 +4,8 @@ server:
 db_postgre:
   host: postgres
   port: 5432
-  user: user_postgres
-  password: password_postgres
+  user: postgres
+  password: postgres
   dbname: gogogo
   maxIdleConns: 10
   maxOpenConns: 100
@@ -41,3 +41,10 @@ telegram:
 jwt:
   secret: dev-secret-key
   access_token_ttl: 15m
+storage:
+  endpoint: http://14.168.118.137:9000
+  access_key: minio
+  secret_key: P@ssword2026
+  bucket_public: public-assets
+  bucket_private: private-assets
+  provider: minio

@@ -14,8 +14,11 @@ import (
 type Querier interface {
 	CountAccounts(ctx context.Context) (int64, error)
 	CountOTPsCreatedSince(ctx context.Context, arg CountOTPsCreatedSinceParams) (int32, error)
+	CountPermissions(ctx context.Context, dollar_1 string) (int64, error)
+	CountRoles(ctx context.Context, dollar_1 string) (int64, error)
 	CountServices(ctx context.Context, dollar_1 interface{}) (int64, error)
 	CountSidebars(ctx context.Context, dollar_1 interface{}) (int64, error)
+	CountSystemAdmins(ctx context.Context, dollar_1 string) (int64, error)
 	CountZones(ctx context.Context, dollar_1 interface{}) (int64, error)
 	CreateAccount(ctx context.Context, arg CreateAccountParams) (Account, error)
 	CreateAccountAppDevice(ctx context.Context, arg CreateAccountAppDeviceParams) (AccountAppDevice, error)
@@ -25,25 +28,35 @@ type Querier interface {
 	CreateOTP(ctx context.Context, arg CreateOTPParams) (SystemOtp, error)
 	CreateOTPAudit(ctx context.Context, arg CreateOTPAuditParams) (SystemOtpAudit, error)
 	CreatePackageSizePricing(ctx context.Context, arg CreatePackageSizePricingParams) (SystemPackageSizePricing, error)
+	CreatePermission(ctx context.Context, arg CreatePermissionParams) (SystemPermission, error)
+	CreateRole(ctx context.Context, arg CreateRoleParams) (SystemRole, error)
+	CreateRolePermission(ctx context.Context, arg CreateRolePermissionParams) error
+	CreateRolePermissionsBatch(ctx context.Context, arg CreateRolePermissionsBatchParams) error
 	CreateService(ctx context.Context, arg CreateServiceParams) (SystemService, error)
 	CreateServiceZone(ctx context.Context, arg CreateServiceZoneParams) (SystemServiceZone, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (SystemSession, error)
 	CreateSidebar(ctx context.Context, arg CreateSidebarParams) (SystemSidebar, error)
 	CreateSurchargeRule(ctx context.Context, arg CreateSurchargeRuleParams) (SystemSurchargeRule, error)
+	CreateSystemAdmin(ctx context.Context, arg CreateSystemAdminParams) (SystemAdmin, error)
 	CreateSystemAdminRefreshToken(ctx context.Context, arg CreateSystemAdminRefreshTokenParams) (SystemAdminRefreshToken, error)
 	CreateSystemLoginHistory(ctx context.Context, arg CreateSystemLoginHistoryParams) (SystemLoginHistory, error)
 	CreateUserProfile(ctx context.Context, arg CreateUserProfileParams) (UserProfile, error)
 	CreateZone(ctx context.Context, arg CreateZoneParams) (SystemZone, error)
 	DeleteAccount(ctx context.Context, id uuid.UUID) error
 	DeleteAccountAppDevice(ctx context.Context, id uuid.UUID) error
+	DeleteAdminRolesByAdminID(ctx context.Context, adminID uuid.UUID) error
 	DeleteDevice(ctx context.Context, id uuid.UUID) error
 	DeleteDistancePricingRule(ctx context.Context, id uuid.UUID) error
 	DeleteExpiredSessions(ctx context.Context) error
 	DeletePackageSizePricing(ctx context.Context, id uuid.UUID) error
+	DeletePermission(ctx context.Context, id uuid.UUID) error
+	DeleteRole(ctx context.Context, id uuid.UUID) error
+	DeleteRolePermissionsByRoleID(ctx context.Context, roleID uuid.UUID) error
 	DeleteService(ctx context.Context, id uuid.UUID) error
 	DeleteServiceZonesByServiceID(ctx context.Context, serviceID uuid.UUID) error
 	DeleteSidebar(ctx context.Context, id uuid.UUID) error
 	DeleteSurchargeRule(ctx context.Context, id uuid.UUID) error
+	DeleteSystemAdmin(ctx context.Context, id uuid.UUID) error
 	DeleteZone(ctx context.Context, id uuid.UUID) error
 	ExpireOldOTPs(ctx context.Context) error
 	GetAccountAppDevice(ctx context.Context, arg GetAccountAppDeviceParams) (AccountAppDevice, error)
@@ -58,6 +71,15 @@ type Querier interface {
 	GetLastOTPCreatedAt(ctx context.Context, arg GetLastOTPCreatedAtParams) (pgtype.Timestamptz, error)
 	GetOldestOTPCreatedAtSince(ctx context.Context, arg GetOldestOTPCreatedAtSinceParams) (pgtype.Timestamptz, error)
 	GetPackageSizePricingByID(ctx context.Context, id uuid.UUID) (SystemPackageSizePricing, error)
+	GetPermissionByCode(ctx context.Context, code pgtype.Text) (SystemPermission, error)
+	GetPermissionByID(ctx context.Context, id uuid.UUID) (SystemPermission, error)
+	GetPermissionIDsByRoleID(ctx context.Context, roleID uuid.UUID) ([]uuid.UUID, error)
+	GetPermissionsByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]SystemPermission, error)
+	GetRoleByCode(ctx context.Context, code string) (SystemRole, error)
+	GetRoleByID(ctx context.Context, id uuid.UUID) (SystemRole, error)
+	GetRoleIDsByAdminID(ctx context.Context, adminID uuid.UUID) ([]uuid.UUID, error)
+	GetRolePermissionPairsByRoleIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]SystemRolePermission, error)
+	GetRolesByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]SystemRole, error)
 	GetServiceByCode(ctx context.Context, code string) (SystemService, error)
 	GetServiceByID(ctx context.Context, id uuid.UUID) (SystemService, error)
 	GetSessionByID(ctx context.Context, id uuid.UUID) (SystemSession, error)
@@ -73,16 +95,20 @@ type Querier interface {
 	GetZoneByCode(ctx context.Context, code string) (GetZoneByCodeRow, error)
 	GetZoneByID(ctx context.Context, id uuid.UUID) (GetZoneByIDRow, error)
 	IncrementOTPAttempt(ctx context.Context, id uuid.UUID) error
+	InsertAdminRole(ctx context.Context, arg InsertAdminRoleParams) error
 	ListAccountAppDevices(ctx context.Context, accountID uuid.UUID) ([]AccountAppDevice, error)
 	ListAccounts(ctx context.Context, arg ListAccountsParams) ([]Account, error)
 	ListActiveSessions(ctx context.Context, accountID uuid.UUID) ([]ListActiveSessionsRow, error)
 	ListDistancePricingRules(ctx context.Context, serviceID pgtype.UUID) ([]SystemDistancePricingRule, error)
 	ListDistancePricingRulesByServiceID(ctx context.Context, serviceID uuid.UUID) ([]SystemDistancePricingRule, error)
 	ListPackageSizePricings(ctx context.Context, serviceID pgtype.UUID) ([]SystemPackageSizePricing, error)
+	ListPermissions(ctx context.Context, arg ListPermissionsParams) ([]SystemPermission, error)
+	ListRoles(ctx context.Context, arg ListRolesParams) ([]SystemRole, error)
 	ListServiceZonesByServiceID(ctx context.Context, serviceID uuid.UUID) ([]SystemServiceZone, error)
 	ListServices(ctx context.Context, arg ListServicesParams) ([]SystemService, error)
 	ListSidebars(ctx context.Context, arg ListSidebarsParams) ([]SystemSidebar, error)
 	ListSurchargeRules(ctx context.Context, arg ListSurchargeRulesParams) ([]SystemSurchargeRule, error)
+	ListSystemAdmins(ctx context.Context, arg ListSystemAdminsParams) ([]SystemAdmin, error)
 	ListZones(ctx context.Context, arg ListZonesParams) ([]ListZonesRow, error)
 	LockOTP(ctx context.Context, id uuid.UUID) error
 	LockOTPWithCount(ctx context.Context, arg LockOTPWithCountParams) error
@@ -100,10 +126,13 @@ type Querier interface {
 	UpdateDistancePricingRule(ctx context.Context, arg UpdateDistancePricingRuleParams) (SystemDistancePricingRule, error)
 	UpdatePackageSizePricing(ctx context.Context, arg UpdatePackageSizePricingParams) (SystemPackageSizePricing, error)
 	UpdatePassword(ctx context.Context, arg UpdatePasswordParams) error
+	UpdatePermission(ctx context.Context, arg UpdatePermissionParams) (SystemPermission, error)
+	UpdateRole(ctx context.Context, arg UpdateRoleParams) (SystemRole, error)
 	UpdateService(ctx context.Context, arg UpdateServiceParams) (SystemService, error)
 	UpdateSessionActivity(ctx context.Context, id uuid.UUID) error
 	UpdateSidebar(ctx context.Context, arg UpdateSidebarParams) (SystemSidebar, error)
 	UpdateSurchargeRule(ctx context.Context, arg UpdateSurchargeRuleParams) (SystemSurchargeRule, error)
+	UpdateSystemAdmin(ctx context.Context, arg UpdateSystemAdminParams) (SystemAdmin, error)
 	UpdateSystemAdminLastLoginAt(ctx context.Context, arg UpdateSystemAdminLastLoginAtParams) error
 	UpdateSystemAdminRefreshTokenActivity(ctx context.Context, id uuid.UUID) error
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (UserProfile, error)

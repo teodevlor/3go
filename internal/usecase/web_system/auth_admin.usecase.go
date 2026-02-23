@@ -21,21 +21,26 @@ type (
 	IAuthAdminUsecase interface {
 		LoginAdmin(ctx context.Context, req *websystemdto.AdminLoginRequestDto, ip string, userAgent string) (*websystemdto.AdminLoginResponseDto, error)
 		RefreshToken(ctx context.Context, refreshToken string, ip string, userAgent string) (*websystemdto.AdminRefreshTokenResponseDto, error)
+		AdminHasPermission(ctx context.Context, adminID uuid.UUID, permissionCode string) (bool, error)
 	}
 
 	authAdminUsecase struct {
-		adminRepo            websystemrepo.ISystemAdminRepository
-		loginHistoryRepo     websystemrepo.ISystemLoginHistoryRepository
-		refreshTokenRepo     websystemrepo.ISystemAdminRefreshTokenRepository
-		txManager            database.TransactionManager
+		adminRepo          websystemrepo.ISystemAdminRepository
+		loginHistoryRepo   websystemrepo.ISystemLoginHistoryRepository
+		refreshTokenRepo   websystemrepo.ISystemAdminRefreshTokenRepository
+		adminRoleRepo      websystemrepo.ISystemAdminRoleRepository
+		roleRepo           websystemrepo.IRoleRepository
+		rolePermissionRepo websystemrepo.IRolePermissionRepository
+		permissionRepo     websystemrepo.IPermissionRepository
+		txManager          database.TransactionManager
 	}
 )
 
 var (
-	ErrAdminNotFound         = errors.New("không tìm thấy admin")
-	ErrAdminInvalidPassword  = errors.New("mật khẩu không chính xác")
-	ErrAdminNotActive        = errors.New("tài khoản admin chưa được kích hoạt")
-	ErrInvalidRefreshToken   = errors.New("refresh token không hợp lệ hoặc đã hết hạn")
+	ErrAdminNotFound        = errors.New("không tìm thấy admin")
+	ErrAdminInvalidPassword = errors.New("mật khẩu không chính xác")
+	ErrAdminNotActive       = errors.New("tài khoản admin chưa được kích hoạt")
+	ErrInvalidRefreshToken  = errors.New("refresh token không hợp lệ hoặc đã hết hạn")
 )
 
 const (
@@ -46,13 +51,21 @@ func NewAuthAdminUsecase(
 	adminRepo websystemrepo.ISystemAdminRepository,
 	loginHistoryRepo websystemrepo.ISystemLoginHistoryRepository,
 	refreshTokenRepo websystemrepo.ISystemAdminRefreshTokenRepository,
+	adminRoleRepo websystemrepo.ISystemAdminRoleRepository,
+	roleRepo websystemrepo.IRoleRepository,
+	rolePermissionRepo websystemrepo.IRolePermissionRepository,
+	permissionRepo websystemrepo.IPermissionRepository,
 	txManager database.TransactionManager,
 ) IAuthAdminUsecase {
 	return &authAdminUsecase{
-		adminRepo:        adminRepo,
-		loginHistoryRepo: loginHistoryRepo,
-		refreshTokenRepo: refreshTokenRepo,
-		txManager:        txManager,
+		adminRepo:          adminRepo,
+		loginHistoryRepo:   loginHistoryRepo,
+		refreshTokenRepo:   refreshTokenRepo,
+		adminRoleRepo:      adminRoleRepo,
+		roleRepo:           roleRepo,
+		rolePermissionRepo: rolePermissionRepo,
+		permissionRepo:     permissionRepo,
+		txManager:          txManager,
 	}
 }
 
@@ -73,13 +86,13 @@ func (u *authAdminUsecase) LoginAdmin(ctx context.Context, req *websystemdto.Adm
 		// Tạo refresh token và lưu vào database
 		refreshToken = generate.GenerateRandomString(64)
 		expiresAt := time.Now().Add(refreshTokenTTL)
-		
+
 		_, err = u.refreshTokenRepo.CreateRefreshToken(txCtx, &model.SystemAdminRefreshToken{
-			AdminID:         admin.ID,
+			AdminID:          admin.ID,
 			RefreshTokenHash: refreshToken,
-			ExpiresAt:       expiresAt,
-			IpAddress:       ip,
-			UserAgent:       userAgent,
+			ExpiresAt:        expiresAt,
+			IpAddress:        ip,
+			UserAgent:        userAgent,
 		})
 		if err != nil {
 			return err
@@ -107,8 +120,49 @@ func (u *authAdminUsecase) LoginAdmin(ctx context.Context, req *websystemdto.Adm
 		return nil, err
 	}
 
-	resp := websystemtransformer.ToAdminLoginResponseDto(accessToken, refreshToken, admin)
+	roles, permissions := u.getAdminRolesAndPermissions(ctx, admin.ID)
+	resp := websystemtransformer.ToAdminLoginResponseDto(accessToken, refreshToken, admin, roles, permissions)
 	return &resp, nil
+}
+
+func (u *authAdminUsecase) AdminHasPermission(ctx context.Context, adminID uuid.UUID, permissionCode string) (bool, error) {
+	if permissionCode == "" {
+		return false, nil
+	}
+	_, permissions := u.getAdminRolesAndPermissions(ctx, adminID)
+	for _, p := range permissions {
+		if p.Code == permissionCode {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (u *authAdminUsecase) getAdminRolesAndPermissions(ctx context.Context, adminID uuid.UUID) ([]websystemdto.RoleItemDto, []websystemdto.PermissionItemDto) {
+	if u.adminRoleRepo == nil || u.roleRepo == nil || u.rolePermissionRepo == nil || u.permissionRepo == nil {
+		return nil, nil
+	}
+	roleIDs, err := u.adminRoleRepo.GetRoleIDsByAdminID(ctx, adminID)
+	if err != nil || len(roleIDs) == 0 {
+		return nil, nil
+	}
+	roles, err := u.roleRepo.GetByIDs(ctx, roleIDs)
+	if err != nil || len(roles) == 0 {
+		return nil, nil
+	}
+	permMap, err := u.rolePermissionRepo.GetPermissionIDsByRoleIDs(ctx, roleIDs)
+	if err != nil {
+		permMap = nil
+	}
+	permIDs := websystemtransformer.GetUniquePermissionIDs(permMap)
+	if len(permIDs) == 0 {
+		return websystemtransformer.ToAdminRolesAndPermissionsDtos(roles, permMap, nil)
+	}
+	permissions, err := u.permissionRepo.GetByIDs(ctx, permIDs)
+	if err != nil || len(permissions) == 0 {
+		return websystemtransformer.ToAdminRolesAndPermissionsDtos(roles, permMap, nil)
+	}
+	return websystemtransformer.ToAdminRolesAndPermissionsDtos(roles, permMap, permissions)
 }
 
 func (u *authAdminUsecase) getAdminForLogin(ctx context.Context, email string, password string) (*model.SystemAdmin, error) {
@@ -215,11 +269,11 @@ func (u *authAdminUsecase) RefreshToken(ctx context.Context, refreshToken string
 		newExpiresAt := now.Add(refreshTokenTTL)
 
 		_, err = u.refreshTokenRepo.CreateRefreshToken(txCtx, &model.SystemAdminRefreshToken{
-			AdminID:         admin.ID,
+			AdminID:          admin.ID,
 			RefreshTokenHash: newRefresh,
-			ExpiresAt:       newExpiresAt,
-			IpAddress:       ip,
-			UserAgent:       userAgent,
+			ExpiresAt:        newExpiresAt,
+			IpAddress:        ip,
+			UserAgent:        userAgent,
 		})
 		if err != nil {
 			return err

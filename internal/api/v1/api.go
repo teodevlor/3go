@@ -1,9 +1,10 @@
 package v1
 
 import (
-	otpcontroller "go-structure/internal/controller"
+	ctl "go-structure/internal/controller"
 	controller "go-structure/internal/controller/app_user"
 	websystemctl "go-structure/internal/controller/web_system"
+	"go-structure/internal/middleware"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -12,7 +13,8 @@ import (
 func NewApiV1(
 	router *gin.Engine,
 	userProfileController controller.UserProfileController,
-	otpController otpcontroller.OTPController,
+	otpController ctl.OTPController,
+	permissionChecker middleware.AdminPermissionChecker,
 	authAdminController websystemctl.AuthAdminController,
 	zoneController websystemctl.ZoneController,
 	sidebarController websystemctl.SidebarController,
@@ -20,6 +22,10 @@ func NewApiV1(
 	distancePricingRuleController websystemctl.DistancePricingRuleController,
 	surchargeRuleController websystemctl.SurchargeRuleController,
 	packageSizePricingController websystemctl.PackageSizePricingController,
+	roleController websystemctl.RoleController,
+	adminController websystemctl.AdminController,
+	permissionController websystemctl.PermissionController,
+	storageController ctl.StorageController,
 ) {
 	apiV1 := router.Group("api/v1")
 	{
@@ -30,6 +36,7 @@ func NewApiV1(
 		// modules
 		NewUserProfileApi(userProfileController).InitUserProfileApi(apiV1, userProfileController)
 		NewOTPApi(otpController).InitOTPApI(apiV1, otpController)
+		NewStorageApi(storageController).InitStorageApi(apiV1, storageController)
 		NewWebSystemApi(
 			authAdminController,
 			zoneController,
@@ -38,7 +45,12 @@ func NewApiV1(
 			distancePricingRuleController,
 			surchargeRuleController,
 			packageSizePricingController,
+			roleController,
+			adminController,
+			permissionController,
 		).InitWebSystemApi(apiV1,
+			middleware.AdminAuthMiddleware(),
+			permissionChecker,
 			authAdminController,
 			zoneController,
 			sidebarController,
@@ -46,6 +58,9 @@ func NewApiV1(
 			distancePricingRuleController,
 			surchargeRuleController,
 			packageSizePricingController,
+			roleController,
+			adminController,
+			permissionController,
 		)
 	}
 }

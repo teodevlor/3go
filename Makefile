@@ -53,6 +53,8 @@ endif
 
 PG_MIGRATION_DIR=internal/orm/postgres/migrations
 PG_SEED_DIR=internal/orm/postgres/migrations/seeds
+# Seeds dùng bảng version riêng để không xung đột với migrations (tránh lỗi "no current version found" khi pg-seed-down).
+PG_SEED_TABLE=goose_seed_version
 MYSQL_MIGRATION_DIR=internal/orm/mysql/migrations
 
 # ======================
@@ -77,17 +79,16 @@ pg-status:
 # ======================
 # POSTGRES SEEDS
 # ======================
-# Mặc định pg-seed-up dùng POSTGRES_DSN_LOCAL (localhost:5432, gogin).
-# Để seed vào DB Docker (localhost:5433, gogogo): make pg-seed-up-docker
+# Dùng -table $(PG_SEED_TABLE) để tách version với migrations. Docker: make pg-seed-up-docker.
 
 pg-seed-up:
-	@goose -dir $(PG_SEED_DIR) postgres "$(POSTGRES_DSN)" up -allow-missing
+	@goose -dir $(PG_SEED_DIR) -table $(PG_SEED_TABLE) postgres "$(POSTGRES_DSN)" up -allow-missing
 
 pg-seed-down:
-	@goose -dir $(PG_SEED_DIR) postgres "$(POSTGRES_DSN)" down
+	@goose -dir $(PG_SEED_DIR) -table $(PG_SEED_TABLE) postgres "$(POSTGRES_DSN)" down
 
 pg-seed-status:
-	@goose -dir $(PG_SEED_DIR) postgres "$(POSTGRES_DSN)" status
+	@goose -dir $(PG_SEED_DIR) -table $(PG_SEED_TABLE) postgres "$(POSTGRES_DSN)" status
 
 pg-seed-new:
 	@goose -dir $(PG_SEED_DIR) create $(name) sql
@@ -135,3 +136,13 @@ run-docker-dev:
 
 run-goose-up-docker-dev:
 	APP_ENV=docker_dev make pg-up
+
+run-goose-down-docker-dev:
+	APP_ENV=docker_dev make pg-down
+
+run-goose-seed-docker-dev:
+	APP_ENV=docker_dev make pg-seed-up
+
+run-goose-seed-reset-docker-dev:
+	APP_ENV=docker_dev make pg-seed-down
+	APP_ENV=docker_dev make pg-seed-up

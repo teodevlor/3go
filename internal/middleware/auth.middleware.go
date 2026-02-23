@@ -9,9 +9,35 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const ContextAccountIDKey = "account_id"
+const (
+	ContextAdminIDKey   = "admin_id"
+	ContextAccountIDKey = "account_id"
+)
 
 func AuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+			resp := common.ErrorResponse(common.StatusUnauthorized, []string{"Unauthorized"})
+			c.AbortWithStatusJSON(common.StatusUnauthorized, resp)
+			return
+		}
+
+		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+
+		accountID, err := jwtutil.ParseAccessToken(tokenStr)
+		if err != nil {
+			resp := common.ErrorResponse(common.StatusUnauthorized, []string{"Invalid or expired token"})
+			c.AbortWithStatusJSON(common.StatusUnauthorized, resp)
+			return
+		}
+
+		c.Set(ContextAccountIDKey, accountID)
+		c.Next()
+	}
+}
+
+func AdminAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
@@ -22,14 +48,14 @@ func AuthMiddleware() gin.HandlerFunc {
 
 		tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
 
-		accountID, err := jwtutil.ParseAccessToken(tokenStr)
+		adminID, err := jwtutil.ParseAdminAccessToken(tokenStr)
 		if err != nil {
 			resp := common.ErrorResponse(common.StatusUnauthorized, []string{"Token không hợp lệ hoặc đã hết hạn"})
 			c.AbortWithStatusJSON(common.StatusUnauthorized, resp)
 			return
 		}
 
-		c.Set(ContextAccountIDKey, accountID)
+		c.Set(ContextAdminIDKey, adminID)
 		c.Next()
 	}
 }
