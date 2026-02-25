@@ -27,14 +27,14 @@ func (q *Queries) CountPermissions(ctx context.Context, dollar_1 string) (int64,
 const createPermission = `-- name: CreatePermission :one
 INSERT INTO system_permissions (resource, action, name, description)
 VALUES ($1, $2, $3, $4)
-RETURNING id, resource, action, code, name, description, created_at, updated_at
+RETURNING id, resource, action, code, name, description, created_at, updated_at, deleted_at
 `
 
 type CreatePermissionParams struct {
-	Resource    string `json:"resource"`
-	Action      string `json:"action"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
+	Resource    string      `json:"resource"`
+	Action      string      `json:"action"`
+	Name        string      `json:"name"`
+	Description pgtype.Text `json:"description"`
 }
 
 func (q *Queries) CreatePermission(ctx context.Context, arg CreatePermissionParams) (SystemPermission, error) {
@@ -54,6 +54,7 @@ func (q *Queries) CreatePermission(ctx context.Context, arg CreatePermissionPara
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -69,7 +70,7 @@ func (q *Queries) DeletePermission(ctx context.Context, id uuid.UUID) error {
 }
 
 const getPermissionByCode = `-- name: GetPermissionByCode :one
-SELECT id, resource, action, code, name, description, created_at, updated_at FROM system_permissions
+SELECT id, resource, action, code, name, description, created_at, updated_at, deleted_at FROM system_permissions
 WHERE code = $1
 `
 
@@ -85,12 +86,13 @@ func (q *Queries) GetPermissionByCode(ctx context.Context, code pgtype.Text) (Sy
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getPermissionByID = `-- name: GetPermissionByID :one
-SELECT id, resource, action, code, name, description, created_at, updated_at FROM system_permissions
+SELECT id, resource, action, code, name, description, created_at, updated_at, deleted_at FROM system_permissions
 WHERE id = $1
 `
 
@@ -106,12 +108,13 @@ func (q *Queries) GetPermissionByID(ctx context.Context, id uuid.UUID) (SystemPe
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getPermissionsByIDs = `-- name: GetPermissionsByIDs :many
-SELECT id, resource, action, code, name, description, created_at, updated_at FROM system_permissions
+SELECT id, resource, action, code, name, description, created_at, updated_at, deleted_at FROM system_permissions
 WHERE id = ANY($1::uuid[])
 `
 
@@ -133,6 +136,7 @@ func (q *Queries) GetPermissionsByIDs(ctx context.Context, dollar_1 []uuid.UUID)
 			&i.Description,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -145,7 +149,7 @@ func (q *Queries) GetPermissionsByIDs(ctx context.Context, dollar_1 []uuid.UUID)
 }
 
 const listPermissions = `-- name: ListPermissions :many
-SELECT id, resource, action, code, name, description, created_at, updated_at FROM system_permissions
+SELECT id, resource, action, code, name, description, created_at, updated_at, deleted_at FROM system_permissions
 WHERE ($1::text = '' OR resource ILIKE '%' || $1 || '%' OR action ILIKE '%' || $1 || '%' OR name ILIKE '%' || $1 || '%')
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
@@ -175,6 +179,7 @@ func (q *Queries) ListPermissions(ctx context.Context, arg ListPermissionsParams
 			&i.Description,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -195,15 +200,15 @@ SET
     description = $5,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $1
-RETURNING id, resource, action, code, name, description, created_at, updated_at
+RETURNING id, resource, action, code, name, description, created_at, updated_at, deleted_at
 `
 
 type UpdatePermissionParams struct {
-	ID          uuid.UUID `json:"id"`
-	Resource    string    `json:"resource"`
-	Action      string    `json:"action"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
+	ID          uuid.UUID   `json:"id"`
+	Resource    string      `json:"resource"`
+	Action      string      `json:"action"`
+	Name        string      `json:"name"`
+	Description pgtype.Text `json:"description"`
 }
 
 func (q *Queries) UpdatePermission(ctx context.Context, arg UpdatePermissionParams) (SystemPermission, error) {
@@ -224,6 +229,7 @@ func (q *Queries) UpdatePermission(ctx context.Context, arg UpdatePermissionPara
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }

@@ -91,9 +91,6 @@ func (ctl *userProfileController) LoginUserProfile(c *gin.Context) *common.Respo
 		if errors.Is(err, usecase.ErrInvalidPassword) {
 			return common.ErrorResponse(common.StatusUnauthorized, []string{err.Error()})
 		}
-		if errors.Is(err, usecase.ErrUserNotActive) {
-			return common.ErrorResponse(common.StatusForbidden, []string{err.Error()})
-		}
 		return common.ErrorResponse(common.StatusInternalServerError, []string{err.Error()})
 	}
 	return common.SuccessResponse(common.StatusOK, result)

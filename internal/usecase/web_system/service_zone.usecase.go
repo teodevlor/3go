@@ -45,9 +45,14 @@ func (u *serviceZoneUsecase) SetZonesForService(ctx context.Context, serviceID u
 	if _, inTx := database.TransactionFromContext(ctx); inTx {
 		return u.setZonesForServiceInTx(ctx, serviceID, zoneIDs)
 	}
-	return u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		return u.setZonesForServiceInTx(txCtx, serviceID, zoneIDs)
-	})
+	_, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (struct{}, error) {
+			return struct{}{}, u.setZonesForServiceInTx(txCtx, serviceID, zoneIDs)
+		},
+	)
+	return err
 }
 
 func (u *serviceZoneUsecase) GetZoneIDsByServiceID(ctx context.Context, serviceID uuid.UUID) ([]uuid.UUID, error) {
@@ -56,4 +61,3 @@ func (u *serviceZoneUsecase) GetZoneIDsByServiceID(ctx context.Context, serviceI
 	}
 	return u.serviceZoneRepo.ListServiceZoneIDsByServiceID(ctx, serviceID)
 }
-

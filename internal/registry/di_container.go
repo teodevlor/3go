@@ -8,6 +8,7 @@ import (
 	"go-structure/config"
 	v1 "go-structure/internal/api/v1"
 	otpcontroller "go-structure/internal/controller"
+	app_driver_controller "go-structure/internal/controller/app_driver"
 	controller "go-structure/internal/controller/app_user"
 	websystem_controller "go-structure/internal/controller/web_system"
 	"go-structure/internal/helper/database"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 	"github.com/sarulabs/di"
 )
 
@@ -138,7 +140,37 @@ func buildDatabase() error {
 		},
 	}
 
-	return builder.Add(pgPoolDef, txManagerDef)
+	// Redis client
+	redisClientDef := di.Def{
+		Name:  RedisClientDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			cfg := ctn.Get(ConfigDIName).(*config.Config)
+			redisCfg := cfg.Redis
+
+			client := redis.NewClient(&redis.Options{
+				Addr:     redisCfg.Addr,
+				Password: redisCfg.Password,
+				DB:       redisCfg.DB,
+				PoolSize: redisCfg.PoolSize,
+			})
+
+			if err := client.Ping(context.Background()).Err(); err != nil {
+				_ = client.Close()
+				return nil, err
+			}
+
+			return client, nil
+		},
+		Close: func(obj interface{}) error {
+			if client, ok := obj.(*redis.Client); ok && client != nil {
+				return client.Close()
+			}
+			return nil
+		},
+	}
+
+	return builder.Add(pgPoolDef, txManagerDef, redisClientDef)
 }
 
 func buildApis() error {
@@ -159,11 +191,15 @@ func buildApis() error {
 			sidebarController := ctn.Get(SidebarControllerDIName).(websystem_controller.SidebarController)
 			serviceController := ctn.Get(ServiceControllerDIName).(websystem_controller.ServiceController)
 			distancePricingRuleController := ctn.Get(DistancePricingRuleControllerDIName).(websystem_controller.DistancePricingRuleController)
+			surchargeConditionController := ctn.Get(SurchargeConditionControllerDIName).(websystem_controller.SurchargeConditionController)
 			surchargeRuleController := ctn.Get(SurchargeRuleControllerDIName).(websystem_controller.SurchargeRuleController)
 			packageSizePricingController := ctn.Get(PackageSizePricingControllerDIName).(websystem_controller.PackageSizePricingController)
 			roleController := ctn.Get(RoleControllerDIName).(websystem_controller.RoleController)
 			adminController := ctn.Get(AdminControllerDIName).(websystem_controller.AdminController)
 			permissionController := ctn.Get(PermissionControllerDIName).(websystem_controller.PermissionController)
+			driverDocumentTypeController := ctn.Get(DriverDocumentTypeControllerDIName).(app_driver_controller.DriverDocumentTypeController)
+			driverProfileController := ctn.Get(DriverProfileControllerDIName).(app_driver_controller.DriverProfileController)
+			driverDocumentController := ctn.Get(DriverDocumentControllerDIName).(app_driver_controller.DriverDocumentController)
 			storageController := ctn.Get(StorageControllerDIName).(otpcontroller.StorageController)
 
 			v1.NewApiV1(
@@ -176,11 +212,15 @@ func buildApis() error {
 				sidebarController,
 				serviceController,
 				distancePricingRuleController,
+				surchargeConditionController,
 				surchargeRuleController,
 				packageSizePricingController,
 				roleController,
 				adminController,
 				permissionController,
+				driverDocumentTypeController,
+				driverProfileController,
+				driverDocumentController,
 				storageController,
 			)
 			return router, nil

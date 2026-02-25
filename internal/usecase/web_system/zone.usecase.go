@@ -62,20 +62,19 @@ func (u *zoneUsecase) CreateZone(ctx context.Context, req *dto.CreateZoneRequest
 		PriceMultiplier: req.PriceMultiplier,
 		IsActive:        req.IsActive,
 	}
-	var zone *model.Zone
-	err = u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		if _, err := u.zoneRepository.GetZoneByCode(txCtx, req.Code); err == nil {
-			return ErrZoneCodeExists
-		} else if !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		created, err := u.zoneRepository.CreateZone(txCtx, zoneInput)
-		if err != nil {
-			return err
-		}
-		zone = created
-		return nil
-	})
+
+	zone, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (*model.Zone, error) {
+			if _, err := u.zoneRepository.GetZoneByCode(txCtx, req.Code); err == nil {
+				return nil, ErrZoneCodeExists
+			} else if !errors.Is(err, pgx.ErrNoRows) {
+				return nil, err
+			}
+			return u.zoneRepository.CreateZone(txCtx, zoneInput)
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -160,18 +159,21 @@ func (u *zoneUsecase) UpdateZone(ctx context.Context, id uuid.UUID, req *dto.Upd
 		PriceMultiplier: req.PriceMultiplier,
 		IsActive:        req.IsActive,
 	}
-	var zone *model.Zone
-	err = u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		updated, err := u.zoneRepository.UpdateZone(txCtx, zoneInput)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrZoneNotFound
+
+	zone, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (*model.Zone, error) {
+			updated, err := u.zoneRepository.UpdateZone(txCtx, zoneInput)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return nil, ErrZoneNotFound
+				}
+				return nil, err
 			}
-			return err
-		}
-		zone = updated
-		return nil
-	})
+			return updated, nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +191,12 @@ func (u *zoneUsecase) DeleteZone(ctx context.Context, id uuid.UUID) error {
 	if u.zoneRepository == nil {
 		return ErrZoneNotFound
 	}
-	return u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		return u.zoneRepository.DeleteZone(txCtx, id)
-	})
+	_, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (struct{}, error) {
+			return struct{}{}, u.zoneRepository.DeleteZone(txCtx, id)
+		},
+	)
+	return err
 }

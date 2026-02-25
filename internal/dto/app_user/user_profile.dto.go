@@ -38,9 +38,11 @@ type (
 	}
 
 	UserLoginResponseDto struct {
-		AccessToken  string                 `json:"access_token" example:"access_token"`
-		RefreshToken string                 `json:"refresh_token" example:"refresh_token"`
-		UserProfile  UserProfileResponseDto `json:"user_profile"`
+		RequireVerifyOtp bool                    `json:"require_verify_otp"`
+		Message          string                  `json:"message,omitempty"`
+		AccessToken      string                  `json:"access_token,omitempty"`
+		RefreshToken     string                  `json:"refresh_token,omitempty"`
+		UserProfile      *UserProfileResponseDto `json:"user_profile,omitempty"`
 	}
 
 	UserProfileResponseDto struct {

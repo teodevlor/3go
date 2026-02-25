@@ -87,25 +87,28 @@ func (u *roleUsecase) Create(ctx context.Context, req *dto.CreateRoleRequestDto)
 		Description: req.Description,
 		IsActive:    req.IsActive,
 	}
-	var role *websystem_model.Role
-	err = u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		if _, err := u.repo.GetByCode(txCtx, req.Code); err == nil {
-			return ErrRoleCodeExists
-		} else if !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		created, err := u.repo.Create(txCtx, params)
-		if err != nil {
-			return err
-		}
-		role = created
-		if u.rolePermissionRepo != nil && len(permissionIDs) > 0 {
-			if err := u.rolePermissionRepo.CreateRolePermissions(txCtx, role.ID, permissionIDs); err != nil {
-				return err
+
+	role, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (*websystem_model.Role, error) {
+			if _, err := u.repo.GetByCode(txCtx, req.Code); err == nil {
+				return nil, ErrRoleCodeExists
+			} else if !errors.Is(err, pgx.ErrNoRows) {
+				return nil, err
 			}
-		}
-		return nil
-	})
+			created, err := u.repo.Create(txCtx, params)
+			if err != nil {
+				return nil, err
+			}
+			if u.rolePermissionRepo != nil && len(permissionIDs) > 0 {
+				if err := u.rolePermissionRepo.CreateRolePermissions(txCtx, created.ID, permissionIDs); err != nil {
+					return nil, err
+				}
+			}
+			return created, nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -193,35 +196,38 @@ func (u *roleUsecase) Update(ctx context.Context, id uuid.UUID, req *dto.UpdateR
 		Description: *req.Description,
 		IsActive:    *req.IsActive,
 	}
-	var role *websystem_model.Role
-	err = u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		existing, err := u.repo.GetByCode(txCtx, *req.Code)
-		if err == nil && existing.ID != id {
-			return ErrRoleCodeExists
-		}
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		updated, err := u.repo.Update(txCtx, params)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrRoleNotFound
+
+	role, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (*websystem_model.Role, error) {
+			existing, err := u.repo.GetByCode(txCtx, *req.Code)
+			if err == nil && existing.ID != id {
+				return nil, ErrRoleCodeExists
 			}
-			return err
-		}
-		role = updated
-		if u.rolePermissionRepo != nil {
-			if err := u.rolePermissionRepo.DeleteByRoleID(txCtx, id); err != nil {
-				return err
+			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				return nil, err
 			}
-			if len(permissionIDs) > 0 {
-				if err := u.rolePermissionRepo.CreateRolePermissions(txCtx, id, permissionIDs); err != nil {
-					return err
+			updated, err := u.repo.Update(txCtx, params)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return nil, ErrRoleNotFound
+				}
+				return nil, err
+			}
+			if u.rolePermissionRepo != nil {
+				if err := u.rolePermissionRepo.DeleteByRoleID(txCtx, id); err != nil {
+					return nil, err
+				}
+				if len(permissionIDs) > 0 {
+					if err := u.rolePermissionRepo.CreateRolePermissions(txCtx, id, permissionIDs); err != nil {
+						return nil, err
+					}
 				}
 			}
-		}
-		return nil
-	})
+			return updated, nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -233,7 +239,12 @@ func (u *roleUsecase) Delete(ctx context.Context, id uuid.UUID) error {
 	if u.repo == nil {
 		return ErrRoleNotFound
 	}
-	return u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		return u.repo.Delete(txCtx, id)
-	})
+	_, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (struct{}, error) {
+			return struct{}{}, u.repo.Delete(txCtx, id)
+		},
+	)
+	return err
 }

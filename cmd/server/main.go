@@ -30,6 +30,8 @@ func main() {
 	global.Logger = logger.NewLoggerApplication(cfg.Logger)
 	zap.ReplaceGlobals(global.Logger.Logger)
 
+	_ = registry.GetDependency(registry.RedisClientDIName)
+
 	// Logger theo channel (auth -> auth.log, http -> http.log, ...)
 	global.ChannelLoggers = make(map[string]*logger.LoggerZap)
 	for name, filePath := range cfg.Logger.Channels {

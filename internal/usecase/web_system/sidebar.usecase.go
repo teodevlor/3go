@@ -25,6 +25,7 @@ type (
 	ISidebarUsecase interface {
 		CreateSidebar(ctx context.Context, req *dto.CreateSidebarRequestDto) (*dto.SidebarResponseDto, error)
 		GetSidebar(ctx context.Context, id uuid.UUID) (*dto.SidebarResponseDto, error)
+		GetSidebarByContext(ctx context.Context, sidebarContext string) (*dto.SidebarResponseDto, error)
 		ListSidebars(ctx context.Context, contextFilter string, page, limit int) (*dto.ListSidebarsResponseDto, error)
 		UpdateSidebar(ctx context.Context, id uuid.UUID, req *dto.UpdateSidebarRequestDto) (*dto.SidebarResponseDto, error)
 		DeleteSidebar(ctx context.Context, id uuid.UUID) error
@@ -62,15 +63,14 @@ func (u *sidebarUsecase) CreateSidebar(ctx context.Context, req *dto.CreateSideb
 		GeneratedAt: genAt,
 		Items:       itemsJSON,
 	}
-	var sidebar *model.Sidebar
-	err = u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		created, err := u.sidebarRepo.CreateSidebar(txCtx, input)
-		if err != nil {
-			return err
-		}
-		sidebar = created
-		return nil
-	})
+
+	sidebar, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (*model.Sidebar, error) {
+			return u.sidebarRepo.CreateSidebar(txCtx, input)
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -79,6 +79,17 @@ func (u *sidebarUsecase) CreateSidebar(ctx context.Context, req *dto.CreateSideb
 
 func (u *sidebarUsecase) GetSidebar(ctx context.Context, id uuid.UUID) (*dto.SidebarResponseDto, error) {
 	sidebar, err := u.sidebarRepo.GetSidebarByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrSidebarNotFound
+		}
+		return nil, err
+	}
+	return u.sidebarToResponse(sidebar), nil
+}
+
+func (u *sidebarUsecase) GetSidebarByContext(ctx context.Context, sidebarContext string) (*dto.SidebarResponseDto, error) {
+	sidebar, err := u.sidebarRepo.GetSidebarByContext(ctx, sidebarContext)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrSidebarNotFound
@@ -140,18 +151,21 @@ func (u *sidebarUsecase) UpdateSidebar(ctx context.Context, id uuid.UUID, req *d
 		GeneratedAt: genAt,
 		Items:       itemsJSON,
 	}
-	var sidebar *model.Sidebar
-	err = u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		updated, err := u.sidebarRepo.UpdateSidebar(txCtx, input)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrSidebarNotFound
+
+	sidebar, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (*model.Sidebar, error) {
+			updated, err := u.sidebarRepo.UpdateSidebar(txCtx, input)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return nil, ErrSidebarNotFound
+				}
+				return nil, err
 			}
-			return err
-		}
-		sidebar = updated
-		return nil
-	})
+			return updated, nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -159,9 +173,14 @@ func (u *sidebarUsecase) UpdateSidebar(ctx context.Context, id uuid.UUID, req *d
 }
 
 func (u *sidebarUsecase) DeleteSidebar(ctx context.Context, id uuid.UUID) error {
-	return u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		return u.sidebarRepo.DeleteSidebar(txCtx, id)
-	})
+	_, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (struct{}, error) {
+			return struct{}{}, u.sidebarRepo.DeleteSidebar(txCtx, id)
+		},
+	)
+	return err
 }
 
 func (u *sidebarUsecase) sidebarToResponse(s *model.Sidebar) *dto.SidebarResponseDto {

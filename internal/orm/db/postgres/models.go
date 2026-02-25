@@ -5,11 +5,147 @@
 package pgdb
 
 import (
+	"database/sql/driver"
+	"fmt"
 	"net/netip"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
+
+type DriverDocumentStatus string
+
+const (
+	DriverDocumentStatusPENDING  DriverDocumentStatus = "PENDING"
+	DriverDocumentStatusAPPROVED DriverDocumentStatus = "APPROVED"
+	DriverDocumentStatusREJECTED DriverDocumentStatus = "REJECTED"
+)
+
+func (e *DriverDocumentStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DriverDocumentStatus(s)
+	case string:
+		*e = DriverDocumentStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DriverDocumentStatus: %T", src)
+	}
+	return nil
+}
+
+type NullDriverDocumentStatus struct {
+	DriverDocumentStatus DriverDocumentStatus `json:"driver_document_status"`
+	Valid                bool                 `json:"valid"` // Valid is true if DriverDocumentStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDriverDocumentStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.DriverDocumentStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DriverDocumentStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDriverDocumentStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DriverDocumentStatus), nil
+}
+
+type DriverProfileStatus string
+
+const (
+	DriverProfileStatusPENDINGPROFILE      DriverProfileStatus = "PENDING_PROFILE"
+	DriverProfileStatusDOCUMENTINCOMPLETE  DriverProfileStatus = "DOCUMENT_INCOMPLETE"
+	DriverProfileStatusPENDINGVERIFICATION DriverProfileStatus = "PENDING_VERIFICATION"
+	DriverProfileStatusACTIVE              DriverProfileStatus = "ACTIVE"
+	DriverProfileStatusSUSPENDED           DriverProfileStatus = "SUSPENDED"
+	DriverProfileStatusREJECTED            DriverProfileStatus = "REJECTED"
+)
+
+func (e *DriverProfileStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DriverProfileStatus(s)
+	case string:
+		*e = DriverProfileStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DriverProfileStatus: %T", src)
+	}
+	return nil
+}
+
+type NullDriverProfileStatus struct {
+	DriverProfileStatus DriverProfileStatus `json:"driver_profile_status"`
+	Valid               bool                `json:"valid"` // Valid is true if DriverProfileStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDriverProfileStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.DriverProfileStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DriverProfileStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDriverProfileStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DriverProfileStatus), nil
+}
+
+type DriverServiceStatus string
+
+const (
+	DriverServiceStatusPENDINGDOCUMENT DriverServiceStatus = "PENDING_DOCUMENT"
+	DriverServiceStatusPENDINGAPPROVAL DriverServiceStatus = "PENDING_APPROVAL"
+	DriverServiceStatusACTIVE          DriverServiceStatus = "ACTIVE"
+	DriverServiceStatusSUSPENDED       DriverServiceStatus = "SUSPENDED"
+	DriverServiceStatusREJECTED        DriverServiceStatus = "REJECTED"
+)
+
+func (e *DriverServiceStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = DriverServiceStatus(s)
+	case string:
+		*e = DriverServiceStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for DriverServiceStatus: %T", src)
+	}
+	return nil
+}
+
+type NullDriverServiceStatus struct {
+	DriverServiceStatus DriverServiceStatus `json:"driver_service_status"`
+	Valid               bool                `json:"valid"` // Valid is true if DriverServiceStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullDriverServiceStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.DriverServiceStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.DriverServiceStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullDriverServiceStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.DriverServiceStatus), nil
+}
 
 type Account struct {
 	ID           uuid.UUID          `json:"id"`
@@ -63,6 +199,83 @@ type Device struct {
 	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
 }
 
+type DriverDocument struct {
+	ID             uuid.UUID            `json:"id"`
+	DriverID       uuid.UUID            `json:"driver_id"`
+	DocumentTypeID uuid.UUID            `json:"document_type_id"`
+	FileUrl        string               `json:"file_url"`
+	ExpireAt       pgtype.Date          `json:"expire_at"`
+	Status         DriverDocumentStatus `json:"status"`
+	RejectReason   pgtype.Text          `json:"reject_reason"`
+	VerifiedAt     pgtype.Timestamptz   `json:"verified_at"`
+	VerifiedBy     pgtype.UUID          `json:"verified_by"`
+	CreatedAt      pgtype.Timestamptz   `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz   `json:"updated_at"`
+	DeletedAt      pgtype.Timestamptz   `json:"deleted_at"`
+}
+
+type DriverDocumentType struct {
+	ID                uuid.UUID          `json:"id"`
+	Code              string             `json:"code"`
+	Name              string             `json:"name"`
+	Description       string             `json:"description"`
+	IsRequired        bool               `json:"is_required"`
+	RequireExpireDate bool               `json:"require_expire_date"`
+	ServiceID         *uuid.UUID         `json:"service_id"`
+	IsActive          bool               `json:"is_active"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	DeletedAt         pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type DriverProfile struct {
+	ID                   uuid.UUID           `json:"id"`
+	AccountID            uuid.UUID           `json:"account_id"`
+	FullName             string              `json:"full_name"`
+	DateOfBirth          pgtype.Date         `json:"date_of_birth"`
+	Gender               pgtype.Text         `json:"gender"`
+	Address              pgtype.Text         `json:"address"`
+	GlobalStatus         DriverProfileStatus `json:"global_status"`
+	Rating               pgtype.Numeric      `json:"rating"`
+	TotalCompletedOrders pgtype.Int4         `json:"total_completed_orders"`
+	CreatedAt            pgtype.Timestamptz  `json:"created_at"`
+	UpdatedAt            pgtype.Timestamptz  `json:"updated_at"`
+	DeletedAt            pgtype.Timestamptz  `json:"deleted_at"`
+}
+
+type DriverProfileStatusHistory struct {
+	ID         uuid.UUID               `json:"id"`
+	DriverID   uuid.UUID               `json:"driver_id"`
+	FromStatus NullDriverProfileStatus `json:"from_status"`
+	ToStatus   DriverProfileStatus     `json:"to_status"`
+	ChangedBy  pgtype.UUID             `json:"changed_by"`
+	Reason     pgtype.Text             `json:"reason"`
+	CreatedAt  pgtype.Timestamptz      `json:"created_at"`
+	DeletedAt  pgtype.Timestamptz      `json:"deleted_at"`
+}
+
+type DriverReview struct {
+	ID         uuid.UUID          `json:"id"`
+	DriverID   uuid.UUID          `json:"driver_id"`
+	OrderID    uuid.UUID          `json:"order_id"`
+	CustomerID uuid.UUID          `json:"customer_id"`
+	Rating     int16              `json:"rating"`
+	Comment    pgtype.Text        `json:"comment"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	DeletedAt  pgtype.Timestamptz `json:"deleted_at"`
+}
+
+type DriverService struct {
+	ID         uuid.UUID           `json:"id"`
+	DriverID   uuid.UUID           `json:"driver_id"`
+	ServiceID  uuid.UUID           `json:"service_id"`
+	Status     DriverServiceStatus `json:"status"`
+	ApprovedAt pgtype.Timestamptz  `json:"approved_at"`
+	ApprovedBy pgtype.UUID         `json:"approved_by"`
+	CreatedAt  pgtype.Timestamptz  `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz  `json:"updated_at"`
+	DeletedAt  pgtype.Timestamptz  `json:"deleted_at"`
+}
+
 type SystemAdmin struct {
 	ID           uuid.UUID          `json:"id"`
 	Email        string             `json:"email"`
@@ -73,6 +286,7 @@ type SystemAdmin struct {
 	LastLoginAt  pgtype.Timestamptz `json:"last_login_at"`
 	CreatedAt    pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type SystemAdminRefreshToken struct {
@@ -176,6 +390,7 @@ type SystemPermission struct {
 	Description pgtype.Text        `json:"description"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type SystemRole struct {
@@ -186,6 +401,7 @@ type SystemRole struct {
 	IsActive    bool               `json:"is_active"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
 }
 
 type SystemRolePermission struct {
@@ -256,18 +472,32 @@ type SystemSidebar struct {
 	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
 }
 
+type SystemSurchargeCondition struct {
+	ID            uuid.UUID   `json:"id"`
+	Code          string      `json:"code"`
+	ConditionType string      `json:"condition_type"`
+	Config        []byte      `json:"config"`
+	IsActive      pgtype.Bool `json:"is_active"`
+}
+
 type SystemSurchargeRule struct {
-	ID            uuid.UUID          `json:"id"`
-	ServiceID     uuid.UUID          `json:"service_id"`
-	ZoneID        uuid.UUID          `json:"zone_id"`
-	SurchargeType string             `json:"surcharge_type"`
-	Amount        pgtype.Numeric     `json:"amount"`
-	Unit          string             `json:"unit"`
-	Condition     []byte             `json:"condition"`
-	IsActive      bool               `json:"is_active"`
-	CreatedAt     pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt     pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt     pgtype.Timestamptz `json:"deleted_at"`
+	ID        uuid.UUID          `json:"id"`
+	ServiceID uuid.UUID          `json:"service_id"`
+	ZoneID    uuid.UUID          `json:"zone_id"`
+	Amount    pgtype.Numeric     `json:"amount"`
+	Unit      string             `json:"unit"`
+	IsActive  bool               `json:"is_active"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+	Priority  int32              `json:"priority"`
+	CreatedBy uuid.UUID          `json:"created_by"`
+	UpdatedBy uuid.UUID          `json:"updated_by"`
+}
+
+type SystemSurchargeRuleCondition struct {
+	SurchargeID uuid.UUID `json:"surcharge_id"`
+	ConditionID uuid.UUID `json:"condition_id"`
 }
 
 type SystemZone struct {

@@ -6,4 +6,7 @@ const (
 
 	// TransactionManagerDIName is the DI name for TransactionManager (pgx).
 	TransactionManagerDIName = "transaction_manager_di"
+
+	// RedisClientDIName is the DI name for *redis.Client.
+	RedisClientDIName = "redis_client_di"
 )

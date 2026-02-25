@@ -12,7 +12,10 @@ import (
 )
 
 type Querier interface {
+	AddSurchargeRuleConditions(ctx context.Context, arg AddSurchargeRuleConditionsParams) error
 	CountAccounts(ctx context.Context) (int64, error)
+	CountDriverDocumentTypes(ctx context.Context, dollar_1 interface{}) (int64, error)
+	CountDriverDocumentTypesByServiceID(ctx context.Context, arg CountDriverDocumentTypesByServiceIDParams) (int64, error)
 	CountOTPsCreatedSince(ctx context.Context, arg CountOTPsCreatedSinceParams) (int32, error)
 	CountPermissions(ctx context.Context, dollar_1 string) (int64, error)
 	CountRoles(ctx context.Context, dollar_1 string) (int64, error)
@@ -24,6 +27,10 @@ type Querier interface {
 	CreateAccountAppDevice(ctx context.Context, arg CreateAccountAppDeviceParams) (AccountAppDevice, error)
 	CreateDevice(ctx context.Context, arg CreateDeviceParams) (Device, error)
 	CreateDistancePricingRule(ctx context.Context, arg CreateDistancePricingRuleParams) (SystemDistancePricingRule, error)
+	CreateDriverDocument(ctx context.Context, arg CreateDriverDocumentParams) (DriverDocument, error)
+	CreateDriverDocumentType(ctx context.Context, arg CreateDriverDocumentTypeParams) (DriverDocumentType, error)
+	CreateDriverProfile(ctx context.Context, arg CreateDriverProfileParams) (DriverProfile, error)
+	CreateDriverProfileStatusHistory(ctx context.Context, arg CreateDriverProfileStatusHistoryParams) (DriverProfileStatusHistory, error)
 	CreateLoginHistory(ctx context.Context, arg CreateLoginHistoryParams) (AppLoginHistory, error)
 	CreateOTP(ctx context.Context, arg CreateOTPParams) (SystemOtp, error)
 	CreateOTPAudit(ctx context.Context, arg CreateOTPAuditParams) (SystemOtpAudit, error)
@@ -36,6 +43,7 @@ type Querier interface {
 	CreateServiceZone(ctx context.Context, arg CreateServiceZoneParams) (SystemServiceZone, error)
 	CreateSession(ctx context.Context, arg CreateSessionParams) (SystemSession, error)
 	CreateSidebar(ctx context.Context, arg CreateSidebarParams) (SystemSidebar, error)
+	CreateSurchargeCondition(ctx context.Context, arg CreateSurchargeConditionParams) (SystemSurchargeCondition, error)
 	CreateSurchargeRule(ctx context.Context, arg CreateSurchargeRuleParams) (SystemSurchargeRule, error)
 	CreateSystemAdmin(ctx context.Context, arg CreateSystemAdminParams) (SystemAdmin, error)
 	CreateSystemAdminRefreshToken(ctx context.Context, arg CreateSystemAdminRefreshTokenParams) (SystemAdminRefreshToken, error)
@@ -47,6 +55,8 @@ type Querier interface {
 	DeleteAdminRolesByAdminID(ctx context.Context, adminID uuid.UUID) error
 	DeleteDevice(ctx context.Context, id uuid.UUID) error
 	DeleteDistancePricingRule(ctx context.Context, id uuid.UUID) error
+	DeleteDriverDocument(ctx context.Context, id uuid.UUID) error
+	DeleteDriverDocumentType(ctx context.Context, id uuid.UUID) error
 	DeleteExpiredSessions(ctx context.Context) error
 	DeletePackageSizePricing(ctx context.Context, id uuid.UUID) error
 	DeletePermission(ctx context.Context, id uuid.UUID) error
@@ -55,7 +65,9 @@ type Querier interface {
 	DeleteService(ctx context.Context, id uuid.UUID) error
 	DeleteServiceZonesByServiceID(ctx context.Context, serviceID uuid.UUID) error
 	DeleteSidebar(ctx context.Context, id uuid.UUID) error
+	DeleteSurchargeCondition(ctx context.Context, id uuid.UUID) error
 	DeleteSurchargeRule(ctx context.Context, id uuid.UUID) error
+	DeleteSurchargeRuleConditionsBySurchargeID(ctx context.Context, surchargeID uuid.UUID) error
 	DeleteSystemAdmin(ctx context.Context, id uuid.UUID) error
 	DeleteZone(ctx context.Context, id uuid.UUID) error
 	ExpireOldOTPs(ctx context.Context) error
@@ -65,9 +77,16 @@ type Querier interface {
 	GetAccountByID(ctx context.Context, id uuid.UUID) (Account, error)
 	GetAccountByPhone(ctx context.Context, phone string) (Account, error)
 	GetActiveOTP(ctx context.Context, arg GetActiveOTPParams) (SystemOtp, error)
+	GetConditionIDsBySurchargeID(ctx context.Context, surchargeID uuid.UUID) ([]uuid.UUID, error)
 	GetDeviceByID(ctx context.Context, id uuid.UUID) (Device, error)
 	GetDeviceByUID(ctx context.Context, deviceUid string) (Device, error)
 	GetDistancePricingRuleByID(ctx context.Context, id uuid.UUID) (SystemDistancePricingRule, error)
+	GetDriverDocumentByID(ctx context.Context, id uuid.UUID) (DriverDocument, error)
+	GetDriverDocumentTypeByCodeAndServiceID(ctx context.Context, arg GetDriverDocumentTypeByCodeAndServiceIDParams) (DriverDocumentType, error)
+	GetDriverDocumentTypeByCodeGlobal(ctx context.Context, code string) (DriverDocumentType, error)
+	GetDriverDocumentTypeByID(ctx context.Context, id uuid.UUID) (DriverDocumentType, error)
+	GetDriverProfileByAccountID(ctx context.Context, accountID uuid.UUID) (DriverProfile, error)
+	GetDriverProfileByID(ctx context.Context, id uuid.UUID) (DriverProfile, error)
 	GetLastOTPCreatedAt(ctx context.Context, arg GetLastOTPCreatedAtParams) (pgtype.Timestamptz, error)
 	GetOldestOTPCreatedAtSince(ctx context.Context, arg GetOldestOTPCreatedAtSinceParams) (pgtype.Timestamptz, error)
 	GetPackageSizePricingByID(ctx context.Context, id uuid.UUID) (SystemPackageSizePricing, error)
@@ -85,7 +104,10 @@ type Querier interface {
 	GetSessionByID(ctx context.Context, id uuid.UUID) (SystemSession, error)
 	GetSessionByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (SystemSession, error)
 	GetSettingByKey(ctx context.Context, key string) (SystemSetting, error)
+	GetSidebarByContext(ctx context.Context, argContext string) (SystemSidebar, error)
 	GetSidebarByID(ctx context.Context, id uuid.UUID) (SystemSidebar, error)
+	GetSurchargeConditionByCode(ctx context.Context, code string) (SystemSurchargeCondition, error)
+	GetSurchargeConditionByID(ctx context.Context, id uuid.UUID) (SystemSurchargeCondition, error)
 	GetSurchargeRuleByID(ctx context.Context, id uuid.UUID) (SystemSurchargeRule, error)
 	GetSystemAdminByEmail(ctx context.Context, email string) (SystemAdmin, error)
 	GetSystemAdminByID(ctx context.Context, id uuid.UUID) (SystemAdmin, error)
@@ -101,12 +123,18 @@ type Querier interface {
 	ListActiveSessions(ctx context.Context, accountID uuid.UUID) ([]ListActiveSessionsRow, error)
 	ListDistancePricingRules(ctx context.Context, serviceID pgtype.UUID) ([]SystemDistancePricingRule, error)
 	ListDistancePricingRulesByServiceID(ctx context.Context, serviceID uuid.UUID) ([]SystemDistancePricingRule, error)
+	ListDriverDocumentTypes(ctx context.Context, arg ListDriverDocumentTypesParams) ([]DriverDocumentType, error)
+	ListDriverDocumentTypesByServiceID(ctx context.Context, arg ListDriverDocumentTypesByServiceIDParams) ([]DriverDocumentType, error)
+	ListDriverDocumentsByDriverID(ctx context.Context, driverID uuid.UUID) ([]DriverDocument, error)
 	ListPackageSizePricings(ctx context.Context, serviceID pgtype.UUID) ([]SystemPackageSizePricing, error)
 	ListPermissions(ctx context.Context, arg ListPermissionsParams) ([]SystemPermission, error)
+	// Trả về document types áp dụng cho service: theo service_id HOẶC chung (service_id IS NULL).
+	ListRequiredDriverDocumentTypesByServiceID(ctx context.Context, serviceID *uuid.UUID) ([]DriverDocumentType, error)
 	ListRoles(ctx context.Context, arg ListRolesParams) ([]SystemRole, error)
 	ListServiceZonesByServiceID(ctx context.Context, serviceID uuid.UUID) ([]SystemServiceZone, error)
 	ListServices(ctx context.Context, arg ListServicesParams) ([]SystemService, error)
 	ListSidebars(ctx context.Context, arg ListSidebarsParams) ([]SystemSidebar, error)
+	ListSurchargeConditions(ctx context.Context) ([]SystemSurchargeCondition, error)
 	ListSurchargeRules(ctx context.Context, arg ListSurchargeRulesParams) ([]SystemSurchargeRule, error)
 	ListSystemAdmins(ctx context.Context, arg ListSystemAdminsParams) ([]SystemAdmin, error)
 	ListZones(ctx context.Context, arg ListZonesParams) ([]ListZonesRow, error)
@@ -124,6 +152,11 @@ type Querier interface {
 	UpdateAccountAppDevice(ctx context.Context, arg UpdateAccountAppDeviceParams) (AccountAppDevice, error)
 	UpdateDevice(ctx context.Context, arg UpdateDeviceParams) (Device, error)
 	UpdateDistancePricingRule(ctx context.Context, arg UpdateDistancePricingRuleParams) (SystemDistancePricingRule, error)
+	UpdateDriverDocument(ctx context.Context, arg UpdateDriverDocumentParams) (DriverDocument, error)
+	// Bulk update (PATCH): chỉ cập nhật các field được truyền (khác NULL).
+	UpdateDriverDocumentPartial(ctx context.Context, arg UpdateDriverDocumentPartialParams) (DriverDocument, error)
+	UpdateDriverDocumentType(ctx context.Context, arg UpdateDriverDocumentTypeParams) (DriverDocumentType, error)
+	UpdateDriverProfile(ctx context.Context, arg UpdateDriverProfileParams) (DriverProfile, error)
 	UpdatePackageSizePricing(ctx context.Context, arg UpdatePackageSizePricingParams) (SystemPackageSizePricing, error)
 	UpdatePassword(ctx context.Context, arg UpdatePasswordParams) error
 	UpdatePermission(ctx context.Context, arg UpdatePermissionParams) (SystemPermission, error)
@@ -131,6 +164,7 @@ type Querier interface {
 	UpdateService(ctx context.Context, arg UpdateServiceParams) (SystemService, error)
 	UpdateSessionActivity(ctx context.Context, id uuid.UUID) error
 	UpdateSidebar(ctx context.Context, arg UpdateSidebarParams) (SystemSidebar, error)
+	UpdateSurchargeCondition(ctx context.Context, arg UpdateSurchargeConditionParams) (SystemSurchargeCondition, error)
 	UpdateSurchargeRule(ctx context.Context, arg UpdateSurchargeRuleParams) (SystemSurchargeRule, error)
 	UpdateSystemAdmin(ctx context.Context, arg UpdateSystemAdminParams) (SystemAdmin, error)
 	UpdateSystemAdminLastLoginAt(ctx context.Context, arg UpdateSystemAdminLastLoginAtParams) error

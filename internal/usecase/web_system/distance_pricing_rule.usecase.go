@@ -28,9 +28,9 @@ type (
 	}
 
 	distancePricingRuleUsecase struct {
-		repo                  websystem_repo.IDistancePricingRuleRepository
-		serviceRepo           websystem_repo.IServiceRepository
-		transactionManager    database.TransactionManager
+		repo               websystem_repo.IDistancePricingRuleRepository
+		serviceRepo        websystem_repo.IServiceRepository
+		transactionManager database.TransactionManager
 	}
 )
 
@@ -58,23 +58,21 @@ func (u *distancePricingRuleUsecase) Create(ctx context.Context, req *dto.Create
 		IsActive:   req.IsActive,
 	}
 
-	var rule *websystem.DistancePricingRule
-	err = u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		if u.serviceRepo != nil {
-			if _, err := u.serviceRepo.GetServiceByID(txCtx, serviceID); err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					return ErrServiceNotFound
+	rule, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (*websystem.DistancePricingRule, error) {
+			if u.serviceRepo != nil {
+				if _, err := u.serviceRepo.GetServiceByID(txCtx, serviceID); err != nil {
+					if errors.Is(err, pgx.ErrNoRows) {
+						return nil, ErrServiceNotFound
+					}
+					return nil, err
 				}
-				return err
 			}
-		}
-		created, err := u.repo.Create(txCtx, params)
-		if err != nil {
-			return err
-		}
-		rule = created
-		return nil
-	})
+			return u.repo.Create(txCtx, params)
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +97,13 @@ func (u *distancePricingRuleUsecase) GetByID(ctx context.Context, id uuid.UUID) 
 		}
 		return nil, err
 	}
-	item := serviceTransformer.ToDistancePricingRuleItemDto(rule)
+	var svc *websystem.Service
+	if u.serviceRepo != nil {
+		if s, err := u.serviceRepo.GetServiceByID(ctx, rule.ServiceID); err == nil {
+			svc = s
+		}
+	}
+	item := serviceTransformer.ToDistancePricingRuleItemDtoWithService(rule, svc)
 	return &item, nil
 }
 
@@ -111,9 +115,23 @@ func (u *distancePricingRuleUsecase) List(ctx context.Context, serviceID *uuid.U
 	if err != nil {
 		return nil, err
 	}
+	serviceByID := make(map[uuid.UUID]*websystem.Service)
+	if u.serviceRepo != nil {
+		seen := make(map[uuid.UUID]struct{})
+		for _, r := range rules {
+			if _, ok := seen[r.ServiceID]; ok {
+				continue
+			}
+			seen[r.ServiceID] = struct{}{}
+			if s, err := u.serviceRepo.GetServiceByID(ctx, r.ServiceID); err == nil {
+				serviceByID[r.ServiceID] = s
+			}
+		}
+	}
 	items := make([]dto.DistancePricingRuleItemDto, 0, len(rules))
 	for _, r := range rules {
-		items = append(items, serviceTransformer.ToDistancePricingRuleItemDto(r))
+		svc := serviceByID[r.ServiceID]
+		items = append(items, serviceTransformer.ToDistancePricingRuleItemDtoWithService(r, svc))
 	}
 	return items, nil
 }
@@ -134,30 +152,39 @@ func (u *distancePricingRuleUsecase) Update(ctx context.Context, id uuid.UUID, r
 		PricePerKm: common.Float64ToNumeric(req.PricePerKm),
 		IsActive:   req.IsActive,
 	}
-	var rule *websystem.DistancePricingRule
-	err = u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		if u.serviceRepo != nil {
-			if _, err := u.serviceRepo.GetServiceByID(txCtx, serviceID); err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					return ErrServiceNotFound
+
+	rule, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (*websystem.DistancePricingRule, error) {
+			if u.serviceRepo != nil {
+				if _, err := u.serviceRepo.GetServiceByID(txCtx, serviceID); err != nil {
+					if errors.Is(err, pgx.ErrNoRows) {
+						return nil, ErrServiceNotFound
+					}
+					return nil, err
 				}
-				return err
 			}
-		}
-		updated, err := u.repo.Update(txCtx, params)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrDistancePricingRuleNotFound
+			updated, err := u.repo.Update(txCtx, params)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return nil, ErrDistancePricingRuleNotFound
+				}
+				return nil, err
 			}
-			return err
-		}
-		rule = updated
-		return nil
-	})
+			return updated, nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
-	item := serviceTransformer.ToDistancePricingRuleItemDto(rule)
+	var svc *websystem.Service
+	if u.serviceRepo != nil {
+		if s, err := u.serviceRepo.GetServiceByID(ctx, rule.ServiceID); err == nil {
+			svc = s
+		}
+	}
+	item := serviceTransformer.ToDistancePricingRuleItemDtoWithService(rule, svc)
 	return &item, nil
 }
 
@@ -165,7 +192,12 @@ func (u *distancePricingRuleUsecase) Delete(ctx context.Context, id uuid.UUID) e
 	if u.repo == nil {
 		return ErrDistancePricingRuleNotFound
 	}
-	return u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		return u.repo.Delete(txCtx, id)
-	})
+	_, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (struct{}, error) {
+			return struct{}{}, u.repo.Delete(txCtx, id)
+		},
+	)
+	return err
 }

@@ -24,42 +24,24 @@ sqlc-clean:
 	rm -rf internal/orm/db/mysql
 
 # ======================
-# DATABASE CONNECTIONS
+# DATABASE (một DSN duy nhất, ưu tiên env POSTGRES_DSN)
 # ======================
+# Ví dụ VPS (dev.yml): postgres://user_postgres:password_postgres@103.90.226.96:5439/gogogo?sslmode=disable
+# Trên server PostgreSQL cần cài PostGIS (extension cho bảng zones), ví dụ: apt install postgresql-14-postgis-3
 
-APP_ENV ?= local
-
-POSTGRES_DSN_LOCAL  = postgres://gogin_user:123456@localhost:5432/gogin?sslmode=disable
-POSTGRES_DSN_DOCKER = postgres://postgres:postgres@localhost:5433/gogogo?sslmode=disable
-
-MYSQL_DSN_LOCAL  = gogin_user:123456@tcp(localhost:3306)/gogin?parseTime=true
-MYSQL_DSN_DOCKER = gogin_user:123456@tcp(mysql:3306)/gogin?parseTime=true
-
-# Dùng DSN Docker khi chạy trong môi trường docker hoặc docker_dev
-ifeq ($(APP_ENV),docker)
-	POSTGRES_DSN = $(POSTGRES_DSN_DOCKER)
-	MYSQL_DSN    = $(MYSQL_DSN_DOCKER)
-else ifeq ($(APP_ENV),docker_dev)
-	POSTGRES_DSN = $(POSTGRES_DSN_DOCKER)
-	MYSQL_DSN    = $(MYSQL_DSN_DOCKER)
-else
-	POSTGRES_DSN = $(POSTGRES_DSN_LOCAL)
-	MYSQL_DSN    = $(MYSQL_DSN_LOCAL)
-endif
+POSTGRES_DSN ?= postgres://user_postgres:password_postgres@103.90.226.96:5439/gogogo?sslmode=disable
+MYSQL_DSN    ?= gogin_user:123456@tcp(localhost:3306)/gogin?parseTime=true
 
 # ======================
-# GOOSE DIRECTORIES
+# GOOSE
 # ======================
 
-PG_MIGRATION_DIR=internal/orm/postgres/migrations
-PG_SEED_DIR=internal/orm/postgres/migrations/seeds
-# Seeds dùng bảng version riêng để không xung đột với migrations (tránh lỗi "no current version found" khi pg-seed-down).
-PG_SEED_TABLE=goose_seed_version
-MYSQL_MIGRATION_DIR=internal/orm/mysql/migrations
+PG_MIGRATION_DIR = internal/orm/postgres/migrations
+PG_SEED_DIR      = internal/orm/postgres/migrations/seeds
+PG_SEED_TABLE   = goose_seed_version
+MYSQL_MIGRATION_DIR = internal/orm/mysql/migrations
 
-# ======================
-# POSTGRES MIGRATIONS
-# ======================
+# --- Postgres migrations ---
 
 pg-new:
 	@goose -dir $(PG_MIGRATION_DIR) create $(name) sql
@@ -70,16 +52,13 @@ pg-up:
 pg-down:
 	@goose -dir $(PG_MIGRATION_DIR) postgres "$(POSTGRES_DSN)" down
 
-pg-reset:
-	@goose -dir $(PG_MIGRATION_DIR) postgres "$(POSTGRES_DSN)" reset
-
 pg-status:
 	@goose -dir $(PG_MIGRATION_DIR) postgres "$(POSTGRES_DSN)" status
 
-# ======================
-# POSTGRES SEEDS
-# ======================
-# Dùng -table $(PG_SEED_TABLE) để tách version với migrations. Docker: make pg-seed-up-docker.
+pg-reset:
+	@goose -dir $(PG_MIGRATION_DIR) postgres "$(POSTGRES_DSN)" reset
+
+# --- Postgres seeds ---
 
 pg-seed-up:
 	@goose -dir $(PG_SEED_DIR) -table $(PG_SEED_TABLE) postgres "$(POSTGRES_DSN)" up -allow-missing
@@ -95,15 +74,7 @@ pg-seed-new:
 
 pg-seed: pg-seed-up
 
-pg-seed-up-docker:
-	APP_ENV=docker_dev $(MAKE) pg-seed-up
-
-pg-seed-down-docker:
-	APP_ENV=docker_dev $(MAKE) pg-seed-down
-
-# ======================
-# MYSQL MIGRATIONS
-# ======================
+# --- MySQL migrations ---
 
 mysql-new:
 	@goose -dir $(MYSQL_MIGRATION_DIR) create $(name) sql
@@ -114,35 +85,8 @@ mysql-up:
 mysql-down:
 	@goose -dir $(MYSQL_MIGRATION_DIR) mysql "$(MYSQL_DSN)" down
 
-mysql-reset:
-	@goose -dir $(MYSQL_MIGRATION_DIR) mysql "$(MYSQL_DSN)" reset
-
 mysql-status:
 	@goose -dir $(MYSQL_MIGRATION_DIR) mysql "$(MYSQL_DSN)" status
 
-# ======================
-# DOCKER
-# ======================
-
-run-docker:
-	chmod +x scripts/start_docker.sh
-	./scripts/start_docker.sh
-
-run-goose-up-docker:
-	APP_ENV=docker make pg-up 
-
-run-docker-dev:
-	docker compose -f docker/docker-compose.dev.yml up -d --build
-
-run-goose-up-docker-dev:
-	APP_ENV=docker_dev make pg-up
-
-run-goose-down-docker-dev:
-	APP_ENV=docker_dev make pg-down
-
-run-goose-seed-docker-dev:
-	APP_ENV=docker_dev make pg-seed-up
-
-run-goose-seed-reset-docker-dev:
-	APP_ENV=docker_dev make pg-seed-down
-	APP_ENV=docker_dev make pg-seed-up
+mysql-reset:
+	@goose -dir $(MYSQL_MIGRATION_DIR) mysql "$(MYSQL_DSN)" reset

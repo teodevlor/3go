@@ -88,27 +88,30 @@ func NewUserProfileUsecase(
 }
 
 func (u *userProfileUsecase) RegisterUserProfile(ctx context.Context, req *dto.UserRegisterRequestDto) (*dto.UserRegisterResponseDto, error) {
-	var otpCode string
-
-	err := u.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		account, err := u.getOrCreateAccount(txCtx, req)
-		if err != nil {
-			return err
-		}
-		if err := u.ensureUserNotAlreadyRegistered(txCtx, account.ID); err != nil {
-			return err
-		}
-		if err := u.createUserProfileRecord(txCtx, account.ID, req.FullName); err != nil {
-			return err
-		}
-		if u.notifyUsecase != nil {
-			otpCode, err = u.otpUsecase.CreateOTP(txCtx, req.Phone, usecase.OTPPurposeRegister)
+	otpCode, err := database.WithTransaction(
+		u.txManager,
+		ctx,
+		func(txCtx context.Context) (string, error) {
+			account, err := u.getOrCreateAccount(txCtx, req)
 			if err != nil {
-				return err
+				return "", err
 			}
-		}
-		return nil
-	})
+			if err := u.ensureUserNotAlreadyRegistered(txCtx, account.ID); err != nil {
+				return "", err
+			}
+			if err := u.createUserProfileRecord(txCtx, account.ID, req.FullName); err != nil {
+				return "", err
+			}
+			if u.notifyUsecase != nil {
+				code, err := u.otpUsecase.CreateOTP(txCtx, req.Phone, usecase.OTPPurposeUserRegister)
+				if err != nil {
+					return "", err
+				}
+				return code, nil
+			}
+			return "", nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -194,7 +197,7 @@ func (u *userProfileUsecase) ActiveUserProfile(ctx context.Context, phone string
 		return false, ErrUserAlreadyActive
 	}
 
-	verified, err := u.otpUsecase.VerifyOTP(ctx, phone, code, usecase.OTPPurposeRegister, ip, userAgent)
+	verified, err := u.otpUsecase.VerifyOTP(ctx, phone, code, usecase.OTPPurposeUserRegister, ip, userAgent)
 	if err != nil {
 		return false, err
 	}
@@ -202,78 +205,88 @@ func (u *userProfileUsecase) ActiveUserProfile(ctx context.Context, phone string
 		return false, ErrInvalidOTP
 	}
 
-	err = u.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		profileInTx, err := u.userProfileRepository.GetByAccountID(txCtx, account.ID)
-		if err != nil {
-			return err
-		}
-		if profileInTx == nil {
-			return ErrUserNotFound
-		}
-		if profileInTx.IsActive {
-			return ErrUserAlreadyActive
-		}
-
-		profileInTx.IsActive = true
-		profileInTx.UpdatedAt = time.Now()
-		_, err = u.userProfileRepository.UpdateUserProfile(txCtx, profileInTx)
-		return err
-	})
+	_, err = database.WithTransaction(
+		u.txManager,
+		ctx,
+		func(txCtx context.Context) (struct{}, error) {
+			profileInTx, err := u.userProfileRepository.GetByAccountID(txCtx, account.ID)
+			if err != nil {
+				return struct{}{}, err
+			}
+			if profileInTx == nil {
+				return struct{}{}, ErrUserNotFound
+			}
+			if profileInTx.IsActive {
+				return struct{}{}, ErrUserAlreadyActive
+			}
+			profileInTx.IsActive = true
+			profileInTx.UpdatedAt = time.Now()
+			_, err = u.userProfileRepository.UpdateUserProfile(txCtx, profileInTx)
+			return struct{}{}, err
+		},
+	)
 	if err != nil {
 		return false, err
 	}
 	return true, nil
 }
 
-// LoginUserProfile: orchestration chính cho luồng login user app
 func (u *userProfileUsecase) LoginUserProfile(ctx context.Context, req *dto.UserLoginRequestDto, ip string, userAgent string) (*dto.UserLoginResponseDto, error) {
-	var (
-		account      *model.Account
-		userProfile  *model.UserProfile
-		refreshToken string
-		device       *model.Device
-	)
-
 	device, err := u.ensureDevice(ctx, req.Device)
 	global.GetChannelLogger("auth").Info("ensureDevice", zap.String("device", device.DeviceUID), zap.Error(err))
 	if err != nil {
 		return nil, err
 	}
 
-	err = u.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		var err error
-		account, userProfile, err = u.getAccountAndProfileForLogin(txCtx, req.Phone, req.Password)
-		if err != nil {
-			_ = u.logLoginHistory(ctx, uuid.Nil, device.ID, appTypeUser, ip, userAgent, err, req.Phone)
-			return err
-		}
+	type txResult struct {
+		account      *model.Account
+		userProfile  *model.UserProfile
+		refreshToken string
+	}
 
-		accountAppDevice, err := u.ensureAccountAppDevice(txCtx, account, device, appTypeUser, req.Device.FCMToken)
-		if err != nil {
-			return err
-		}
+	res, err := database.WithTransaction(
+		u.txManager,
+		ctx,
+		func(txCtx context.Context) (txResult, error) {
+			account, userProfile, err := u.getAccountAndProfileForLogin(txCtx, req.Phone, req.Password)
+			if err != nil {
+				_ = u.logLoginHistory(ctx, uuid.Nil, device.ID, appTypeUser, ip, userAgent, err, req.Phone)
+				return txResult{}, err
+			}
 
-		refreshToken, err = u.createLoginSession(txCtx, accountAppDevice.ID, ip, userAgent)
-		if err != nil {
-			return err
-		}
+			accountAppDevice, err := u.ensureAccountAppDevice(txCtx, account, device, appTypeUser, req.Device.FCMToken)
+			if err != nil {
+				return txResult{}, err
+			}
 
-		if err := u.logLoginHistory(txCtx, account.ID, device.ID, appTypeUser, ip, userAgent, nil, ""); err != nil {
-			return err
-		}
+			refreshToken, err := u.createLoginSession(txCtx, accountAppDevice.ID, ip, userAgent)
+			if err != nil {
+				return txResult{}, err
+			}
 
-		return nil
-	})
+			if err := u.logLoginHistory(txCtx, account.ID, device.ID, appTypeUser, ip, userAgent, nil, ""); err != nil {
+				return txResult{}, err
+			}
+
+			return txResult{account: account, userProfile: userProfile, refreshToken: refreshToken}, nil
+		},
+	)
+	if err != nil {
+		if errors.Is(err, ErrUserNotActive) {
+			return &dto.UserLoginResponseDto{
+				RequireVerifyOtp: true,
+				Message:          "vui lòng xác thực OTP trước khi đăng nhập",
+			}, nil
+		}
+		return nil, err
+	}
+
+	accessToken, err := jwtutil.GenerateAccessToken(res.account.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	accessToken, err := jwtutil.GenerateAccessToken(account.ID)
-	if err != nil {
-		return nil, err
-	}
-
-	resp := appusertransformer.ToLoginResponseDto(accessToken, refreshToken, account, userProfile)
+	resp := appusertransformer.ToLoginResponseDto(accessToken, res.refreshToken, res.account, res.userProfile)
 	return &resp, nil
 }
 
@@ -304,7 +317,6 @@ func (u *userProfileUsecase) getAccountAndProfileForLogin(ctx context.Context, p
 	return account, userProfile, nil
 }
 
-// ensureDevice đảm bảo tồn tại 1 record device tương ứng với thông tin từ client
 func (u *userProfileUsecase) ensureDevice(ctx context.Context, deviceReq dto.Device) (*model.Device, error) {
 	device, err := u.deviceRepository.GetDeviceByUID(ctx, deviceReq.DeviceUID)
 	if err != nil {
@@ -360,7 +372,6 @@ func (u *userProfileUsecase) ensureAccountAppDevice(
 	return updated, nil
 }
 
-// createLoginSession tạo session + refresh token mới cho 1 account_app_device
 func (u *userProfileUsecase) createLoginSession(
 	ctx context.Context,
 	accountAppDeviceID uuid.UUID,
@@ -453,73 +464,75 @@ func (u *userProfileUsecase) GetUserProfile(ctx context.Context, accountID uuid.
 }
 
 func (u *userProfileUsecase) RefreshToken(ctx context.Context, refreshToken string) (*dto.RefreshTokenResponseDto, error) {
-	var (
+	type txResult struct {
 		account     *model.Account
 		userProfile *model.UserProfile
 		newRefresh  string
 		newAccess   string
+	}
+
+	res, err := database.WithTransaction(
+		u.txManager,
+		ctx,
+		func(txCtx context.Context) (txResult, error) {
+			session, err := u.sessionRepository.GetSessionByRefreshToken(txCtx, refreshToken)
+			if err != nil || session == nil {
+				return txResult{}, ErrInvalidRefreshToken
+			}
+
+			now := time.Now()
+			if session.IsRevoked || now.After(session.ExpiresAt) {
+				_ = u.sessionRepository.RevokeSessionByRefreshToken(txCtx, refreshToken, "expired_or_revoked")
+				return txResult{}, ErrInvalidRefreshToken
+			}
+
+			accountAppDevice, err := u.accountAppDeviceRepo.GetByID(txCtx, session.AccountAppDeviceID)
+			if err != nil || accountAppDevice == nil {
+				return txResult{}, ErrInvalidRefreshToken
+			}
+
+			userProfile, err := u.userProfileRepository.GetByAccountID(txCtx, accountAppDevice.AccountID)
+			if err != nil || userProfile == nil {
+				return txResult{}, ErrUserNotFound
+			}
+			if !userProfile.IsActive {
+				return txResult{}, ErrUserNotActive
+			}
+
+			account, err := u.accountRepository.GetById(txCtx, accountAppDevice.AccountID.String())
+			if err != nil || account == nil {
+				return txResult{}, ErrUserNotFound
+			}
+
+			if err := u.sessionRepository.RevokeSessionByRefreshToken(txCtx, refreshToken, "rotated"); err != nil {
+				return txResult{}, err
+			}
+
+			newRefresh := generate.GenerateRandomString(64)
+			_, err = u.sessionRepository.CreateSession(txCtx, &model.Session{
+				AccountAppDeviceID: accountAppDevice.ID,
+				RefreshTokenHash:   newRefresh,
+				ExpiresAt:          now.Add(refreshTokenTTL),
+				IpAddress:          session.IpAddress,
+				UserAgent:          session.UserAgent,
+			})
+			if err != nil {
+				return txResult{}, err
+			}
+
+			newAccess, err := jwtutil.GenerateAccessToken(account.ID)
+			if err != nil {
+				return txResult{}, err
+			}
+
+			return txResult{account: account, userProfile: userProfile, newRefresh: newRefresh, newAccess: newAccess}, nil
+		},
 	)
-
-	err := u.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		session, err := u.sessionRepository.GetSessionByRefreshToken(txCtx, refreshToken)
-		if err != nil || session == nil {
-			return ErrInvalidRefreshToken
-		}
-
-		now := time.Now()
-		if session.IsRevoked || now.After(session.ExpiresAt) {
-			_ = u.sessionRepository.RevokeSessionByRefreshToken(txCtx, refreshToken, "expired_or_revoked")
-			return ErrInvalidRefreshToken
-		}
-
-		accountAppDevice, err := u.accountAppDeviceRepo.GetByID(txCtx, session.AccountAppDeviceID)
-		if err != nil || accountAppDevice == nil {
-			return ErrInvalidRefreshToken
-		}
-
-		userProfile, err = u.userProfileRepository.GetByAccountID(txCtx, accountAppDevice.AccountID)
-		if err != nil || userProfile == nil {
-			return ErrUserNotFound
-		}
-		if !userProfile.IsActive {
-			return ErrUserNotActive
-		}
-
-		account, err = u.accountRepository.GetById(txCtx, accountAppDevice.AccountID.String())
-		if err != nil || account == nil {
-			return ErrUserNotFound
-		}
-
-		if err := u.sessionRepository.RevokeSessionByRefreshToken(txCtx, refreshToken, "rotated"); err != nil {
-			return err
-		}
-
-		newRefresh = generate.GenerateRandomString(64)
-		newExpiresAt := now.Add(refreshTokenTTL)
-
-		_, err = u.sessionRepository.CreateSession(txCtx, &model.Session{
-			AccountAppDeviceID: accountAppDevice.ID,
-			RefreshTokenHash:   newRefresh,
-			ExpiresAt:          newExpiresAt,
-			IpAddress:          session.IpAddress,
-			UserAgent:          session.UserAgent,
-		})
-		if err != nil {
-			return err
-		}
-
-		newAccess, err = jwtutil.GenerateAccessToken(account.ID)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
 	if err != nil {
 		return nil, err
 	}
 
-	resp := appusertransformer.ToRefreshTokenResponseDto(newAccess, newRefresh)
+	resp := appusertransformer.ToRefreshTokenResponseDto(res.newAccess, res.newRefresh)
 	return &resp, nil
 }
 
@@ -528,32 +541,48 @@ func (u *userProfileUsecase) Logout(ctx context.Context, accountID uuid.UUID) er
 }
 
 func (u *userProfileUsecase) UpdateUserProfile(ctx context.Context, accountID uuid.UUID, req *dto.UpdateUserProfile) (*dto.UpdateUserProfileResponseDto, error) {
-	userProfile, err := u.userProfileRepository.GetByAccountID(ctx, accountID)
+	type txResult struct {
+		account        *model.Account
+		updatedProfile *model.UserProfile
+	}
+
+	res, err := database.WithTransaction(
+		u.txManager,
+		ctx,
+		func(txCtx context.Context) (txResult, error) {
+			userProfile, err := u.userProfileRepository.GetByAccountID(txCtx, accountID)
+			if err != nil {
+				return txResult{}, err
+			}
+			if userProfile == nil {
+				return txResult{}, ErrUserNotFound
+			}
+
+			account, err := u.accountRepository.GetById(txCtx, accountID.String())
+			if err != nil {
+				return txResult{}, err
+			}
+			if account == nil {
+				return txResult{}, ErrUserNotFound
+			}
+
+			userProfile.FullName = req.FullName
+			userProfile.AvatarURL = req.AvatarURL
+			userProfile.UpdatedAt = time.Now()
+
+			updatedProfile, err := u.userProfileRepository.UpdateUserProfile(txCtx, userProfile)
+			if err != nil {
+				return txResult{}, err
+			}
+
+			return txResult{account: account, updatedProfile: updatedProfile}, nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
-	if userProfile == nil {
-		return nil, ErrUserNotFound
-	}
 
-	account, err := u.accountRepository.GetById(ctx, accountID.String())
-	if err != nil {
-		return nil, err
-	}
-	if account == nil {
-		return nil, ErrUserNotFound
-	}
-
-	userProfile.FullName = req.FullName
-	userProfile.AvatarURL = req.AvatarURL
-	userProfile.UpdatedAt = time.Now()
-
-	updatedProfile, err := u.userProfileRepository.UpdateUserProfile(ctx, userProfile)
-	if err != nil {
-		return nil, err
-	}
-
-	resp := appusertransformer.ToUpdateUserProfileResponseDto("Cập nhật thông tin thành công", account, updatedProfile)
+	resp := appusertransformer.ToUpdateUserProfileResponseDto("Cập nhật thông tin thành công", res.account, res.updatedProfile)
 	return &resp, nil
 }
 
@@ -603,17 +632,16 @@ func (u *userProfileUsecase) ResetPassword(ctx context.Context, phone string, co
 		return nil, err
 	}
 
-	err = u.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		if err := u.accountRepository.UpdatePassword(txCtx, account.ID, hashedPassword); err != nil {
-			return err
-		}
-
-		if err := u.sessionRepository.RevokeAllSessionsByAccount(txCtx, account.ID, "password_reset"); err != nil {
-			return err
-		}
-
-		return nil
-	})
+	_, err = database.WithTransaction(
+		u.txManager,
+		ctx,
+		func(txCtx context.Context) (struct{}, error) {
+			if err := u.accountRepository.UpdatePassword(txCtx, account.ID, hashedPassword); err != nil {
+				return struct{}{}, err
+			}
+			return struct{}{}, u.sessionRepository.RevokeAllSessionsByAccount(txCtx, account.ID, "password_reset")
+		},
+	)
 	if err != nil {
 		return nil, err
 	}

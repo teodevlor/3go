@@ -2,6 +2,7 @@ package v1
 
 import (
 	ctl "go-structure/internal/controller"
+	app_driver_controller "go-structure/internal/controller/app_driver"
 	controller "go-structure/internal/controller/app_user"
 	websystemctl "go-structure/internal/controller/web_system"
 	"go-structure/internal/middleware"
@@ -20,11 +21,15 @@ func NewApiV1(
 	sidebarController websystemctl.SidebarController,
 	serviceController websystemctl.ServiceController,
 	distancePricingRuleController websystemctl.DistancePricingRuleController,
+	surchargeConditionController websystemctl.SurchargeConditionController,
 	surchargeRuleController websystemctl.SurchargeRuleController,
 	packageSizePricingController websystemctl.PackageSizePricingController,
 	roleController websystemctl.RoleController,
 	adminController websystemctl.AdminController,
 	permissionController websystemctl.PermissionController,
+	driverDocumentTypeController app_driver_controller.DriverDocumentTypeController,
+	driverProfileController app_driver_controller.DriverProfileController,
+	driverDocumentController app_driver_controller.DriverDocumentController,
 	storageController ctl.StorageController,
 ) {
 	apiV1 := router.Group("api/v1")
@@ -43,6 +48,7 @@ func NewApiV1(
 			sidebarController,
 			serviceController,
 			distancePricingRuleController,
+			surchargeConditionController,
 			surchargeRuleController,
 			packageSizePricingController,
 			roleController,
@@ -56,11 +62,22 @@ func NewApiV1(
 			sidebarController,
 			serviceController,
 			distancePricingRuleController,
+			surchargeConditionController,
 			surchargeRuleController,
 			packageSizePricingController,
 			roleController,
 			adminController,
 			permissionController,
+		)
+		NewAppDriverApi(
+			driverDocumentTypeController,
+			driverProfileController,
+			driverDocumentController,
+			zoneController,
+		).InitAppDriverApi(
+			apiV1,
+			middleware.AdminAuthMiddleware(),
+			permissionChecker,
 		)
 	}
 }

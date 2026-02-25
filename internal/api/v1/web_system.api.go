@@ -19,6 +19,7 @@ type (
 			sidebarController websystemctl.SidebarController,
 			serviceController websystemctl.ServiceController,
 			distancePricingRuleController websystemctl.DistancePricingRuleController,
+			surchargeConditionController websystemctl.SurchargeConditionController,
 			surchargeRuleController websystemctl.SurchargeRuleController,
 			packageSizePricingController websystemctl.PackageSizePricingController,
 			roleController websystemctl.RoleController,
@@ -33,6 +34,7 @@ type (
 		sidebarController             websystemctl.SidebarController
 		serviceController             websystemctl.ServiceController
 		distancePricingRuleController websystemctl.DistancePricingRuleController
+		surchargeConditionController  websystemctl.SurchargeConditionController
 		surchargeRuleController       websystemctl.SurchargeRuleController
 		packageSizePricingController  websystemctl.PackageSizePricingController
 		roleController                websystemctl.RoleController
@@ -51,6 +53,7 @@ func NewWebSystemApi(
 	sidebarController websystemctl.SidebarController,
 	serviceController websystemctl.ServiceController,
 	distancePricingRuleController websystemctl.DistancePricingRuleController,
+	surchargeConditionController websystemctl.SurchargeConditionController,
 	surchargeRuleController websystemctl.SurchargeRuleController,
 	packageSizePricingController websystemctl.PackageSizePricingController,
 	roleController websystemctl.RoleController,
@@ -63,6 +66,7 @@ func NewWebSystemApi(
 		sidebarController:             sidebarController,
 		serviceController:             serviceController,
 		distancePricingRuleController: distancePricingRuleController,
+		surchargeConditionController:  surchargeConditionController,
 		surchargeRuleController:       surchargeRuleController,
 		packageSizePricingController:  packageSizePricingController,
 		roleController:                roleController,
@@ -80,6 +84,7 @@ func (a *webSystemApi) InitWebSystemApi(
 	sidebarController websystemctl.SidebarController,
 	serviceController websystemctl.ServiceController,
 	distancePricingRuleController websystemctl.DistancePricingRuleController,
+	surchargeConditionController websystemctl.SurchargeConditionController,
 	surchargeRuleController websystemctl.SurchargeRuleController,
 	packageSizePricingController websystemctl.PackageSizePricingController,
 	roleController websystemctl.RoleController,
@@ -188,6 +193,28 @@ func (a *webSystemApi) InitWebSystemApi(
 				c.JSON(http.StatusOK, resp)
 			})
 
+			// Surcharge conditions (điều kiện phụ thu)
+			protected.GET("surcharge-conditions", middleware.RequirePermission(permissionChecker, constants.PermissionSurchargeRuleList), func(c *gin.Context) {
+				resp := surchargeConditionController.List(c)
+				c.JSON(http.StatusOK, resp)
+			})
+			protected.POST("surcharge-conditions", middleware.RequirePermission(permissionChecker, constants.PermissionSurchargeRuleCreate), func(c *gin.Context) {
+				resp := surchargeConditionController.Create(c)
+				c.JSON(http.StatusOK, resp)
+			})
+			protected.GET("surcharge-conditions/:id", middleware.RequirePermission(permissionChecker, constants.PermissionSurchargeRuleRead), func(c *gin.Context) {
+				resp := surchargeConditionController.GetByID(c)
+				c.JSON(http.StatusOK, resp)
+			})
+			protected.PUT("surcharge-conditions/:id", middleware.RequirePermission(permissionChecker, constants.PermissionSurchargeRuleUpdate), func(c *gin.Context) {
+				resp := surchargeConditionController.Update(c)
+				c.JSON(http.StatusOK, resp)
+			})
+			protected.DELETE("surcharge-conditions/:id", middleware.RequirePermission(permissionChecker, constants.PermissionSurchargeRuleDelete), func(c *gin.Context) {
+				resp := surchargeConditionController.Delete(c)
+				c.JSON(http.StatusOK, resp)
+			})
+
 			// Package size pricing (quy tắc giá theo kích thước gói)
 			protected.GET("package-size-pricings", middleware.RequirePermission(permissionChecker, constants.PermissionPackageSizePricingList), func(c *gin.Context) {
 				resp := packageSizePricingController.List(c)
@@ -217,6 +244,10 @@ func (a *webSystemApi) InitWebSystemApi(
 			})
 			protected.GET("sidebars", middleware.RequirePermission(permissionChecker, constants.PermissionSidebarList), func(c *gin.Context) {
 				resp := sidebarController.ListSidebars(c)
+				c.JSON(http.StatusOK, resp)
+			})
+			protected.GET("sidebars/by-context/:context", middleware.RequirePermission(permissionChecker, constants.PermissionSidebarRead), func(c *gin.Context) {
+				resp := sidebarController.GetSidebarByContext(c)
 				c.JSON(http.StatusOK, resp)
 			})
 			protected.GET("sidebars/:id", middleware.RequirePermission(permissionChecker, constants.PermissionSidebarRead), func(c *gin.Context) {

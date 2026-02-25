@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	common "go-structure/internal/common"
+	dto_common "go-structure/internal/dto/common"
 	dto "go-structure/internal/dto/web_system"
 	"go-structure/internal/helper/database"
 	pgdb "go-structure/internal/orm/db/postgres"
@@ -21,10 +22,10 @@ var ErrSurchargeRuleNotFound = errors.New("không tìm thấy quy tắc phụ th
 
 type (
 	ISurchargeRuleUsecase interface {
-		Create(ctx context.Context, req *dto.CreateSurchargeRuleRequestDto) (*dto.SurchargeRuleItemDto, error)
+		Create(ctx context.Context, adminID uuid.UUID, req *dto.CreateSurchargeRuleRequestDto) (*dto.SurchargeRuleItemDto, error)
 		GetByID(ctx context.Context, id uuid.UUID) (*dto.SurchargeRuleItemDto, error)
-		List(ctx context.Context, serviceID, zoneID *uuid.UUID) ([]dto.SurchargeRuleItemDto, error)
-		Update(ctx context.Context, id uuid.UUID, req *dto.UpdateSurchargeRuleRequestDto) (*dto.SurchargeRuleItemDto, error)
+		List(ctx context.Context, serviceID, zoneID *uuid.UUID) (*dto.ListSurchargeRulesResponseDto, error)
+		Update(ctx context.Context, adminID uuid.UUID, id uuid.UUID, req *dto.UpdateSurchargeRuleRequestDto) (*dto.SurchargeRuleItemDto, error)
 		Delete(ctx context.Context, id uuid.UUID) error
 	}
 
@@ -50,7 +51,7 @@ func NewSurchargeRuleUsecase(
 	}
 }
 
-func (u *surchargeRuleUsecase) Create(ctx context.Context, req *dto.CreateSurchargeRuleRequestDto) (*dto.SurchargeRuleItemDto, error) {
+func (u *surchargeRuleUsecase) Create(ctx context.Context, adminID uuid.UUID, req *dto.CreateSurchargeRuleRequestDto) (*dto.SurchargeRuleItemDto, error) {
 	if u.repo == nil {
 		return nil, nil
 	}
@@ -62,45 +63,40 @@ func (u *surchargeRuleUsecase) Create(ctx context.Context, req *dto.CreateSurcha
 	if err != nil {
 		return nil, err
 	}
-	condition := req.Condition
-	if condition == nil {
-		condition = []byte("{}")
-	}
 	params := pgdb.CreateSurchargeRuleParams{
-		ServiceID:     serviceID,
-		ZoneID:        zoneID,
-		SurchargeType: req.SurchargeType,
-		Amount:        common.Float64ToNumeric(req.Amount),
-		Unit:          req.Unit,
-		Condition:     condition,
-		IsActive:      req.IsActive,
+		ServiceID: serviceID,
+		ZoneID:    zoneID,
+		Amount:    common.Float64ToNumeric(req.Amount),
+		Unit:      req.Unit,
+		IsActive:  req.IsActive,
+		Priority:  int32(req.Priority),
+		CreatedBy: adminID,
+		UpdatedBy: adminID,
 	}
 
-	var rule *websystem_model.SurchargeRule
-	err = u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		if u.serviceRepo != nil {
-			if _, err := u.serviceRepo.GetServiceByID(txCtx, serviceID); err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					return ErrServiceNotFound
+	rule, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (*websystem_model.SurchargeRule, error) {
+			if u.serviceRepo != nil {
+				if _, err := u.serviceRepo.GetServiceByID(txCtx, serviceID); err != nil {
+					if errors.Is(err, pgx.ErrNoRows) {
+						return nil, ErrServiceNotFound
+					}
+					return nil, err
 				}
-				return err
 			}
-		}
-		if u.zoneRepo != nil {
-			if _, err := u.zoneRepo.GetZoneByID(txCtx, zoneID); err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					return ErrZoneNotFound
+			if u.zoneRepo != nil {
+				if _, err := u.zoneRepo.GetZoneByID(txCtx, zoneID); err != nil {
+					if errors.Is(err, pgx.ErrNoRows) {
+						return nil, ErrZoneNotFound
+					}
+					return nil, err
 				}
-				return err
 			}
-		}
-		created, err := u.repo.Create(txCtx, params)
-		if err != nil {
-			return err
-		}
-		rule = created
-		return nil
-	})
+			return u.repo.Create(txCtx, params)
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -123,9 +119,12 @@ func (u *surchargeRuleUsecase) GetByID(ctx context.Context, id uuid.UUID) (*dto.
 	return &item, nil
 }
 
-func (u *surchargeRuleUsecase) List(ctx context.Context, serviceID, zoneID *uuid.UUID) ([]dto.SurchargeRuleItemDto, error) {
+func (u *surchargeRuleUsecase) List(ctx context.Context, serviceID, zoneID *uuid.UUID) (*dto.ListSurchargeRulesResponseDto, error) {
 	if u.repo == nil {
-		return nil, nil
+		return &dto.ListSurchargeRulesResponseDto{
+			Items:      nil,
+			Pagination: dto_common.PaginationMeta{Page: 1, Limit: 0, Total: 0},
+		}, nil
 	}
 	rules, err := u.repo.List(ctx, serviceID, zoneID)
 	if err != nil {
@@ -135,10 +134,17 @@ func (u *surchargeRuleUsecase) List(ctx context.Context, serviceID, zoneID *uuid
 	for _, r := range rules {
 		items = append(items, serviceTransformer.ToSurchargeRuleItemDto(r))
 	}
-	return items, nil
+	return &dto.ListSurchargeRulesResponseDto{
+		Items: items,
+		Pagination: dto_common.PaginationMeta{
+			Page:  1,
+			Limit: len(items),
+			Total: int64(len(items)),
+		},
+	}, nil
 }
 
-func (u *surchargeRuleUsecase) Update(ctx context.Context, id uuid.UUID, req *dto.UpdateSurchargeRuleRequestDto) (*dto.SurchargeRuleItemDto, error) {
+func (u *surchargeRuleUsecase) Update(ctx context.Context, adminID uuid.UUID, id uuid.UUID, req *dto.UpdateSurchargeRuleRequestDto) (*dto.SurchargeRuleItemDto, error) {
 	if u.repo == nil {
 		return nil, ErrSurchargeRuleNotFound
 	}
@@ -150,50 +156,48 @@ func (u *surchargeRuleUsecase) Update(ctx context.Context, id uuid.UUID, req *dt
 	if err != nil {
 		return nil, err
 	}
-	condition := req.Condition
-	if condition == nil {
-		condition = []byte("{}")
-	}
 	params := pgdb.UpdateSurchargeRuleParams{
-		ID:            id,
-		ServiceID:     serviceID,
-		ZoneID:        zoneID,
-		SurchargeType: req.SurchargeType,
-		Amount:        common.Float64ToNumeric(req.Amount),
-		Unit:          req.Unit,
-		Condition:     condition,
-		IsActive:      req.IsActive,
+		ID:        id,
+		ServiceID: serviceID,
+		ZoneID:    zoneID,
+		Amount:    common.Float64ToNumeric(req.Amount),
+		Unit:      req.Unit,
+		IsActive:  req.IsActive,
+		Priority:  int32(req.Priority),
+		UpdatedBy: adminID,
 	}
 
-	var rule *websystem_model.SurchargeRule
-	err = u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		if u.serviceRepo != nil {
-			if _, err := u.serviceRepo.GetServiceByID(txCtx, serviceID); err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					return ErrServiceNotFound
+	rule, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (*websystem_model.SurchargeRule, error) {
+			if u.serviceRepo != nil {
+				if _, err := u.serviceRepo.GetServiceByID(txCtx, serviceID); err != nil {
+					if errors.Is(err, pgx.ErrNoRows) {
+						return nil, ErrServiceNotFound
+					}
+					return nil, err
 				}
-				return err
 			}
-		}
-		if u.zoneRepo != nil {
-			if _, err := u.zoneRepo.GetZoneByID(txCtx, zoneID); err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					return ErrZoneNotFound
+			if u.zoneRepo != nil {
+				if _, err := u.zoneRepo.GetZoneByID(txCtx, zoneID); err != nil {
+					if errors.Is(err, pgx.ErrNoRows) {
+						return nil, ErrZoneNotFound
+					}
+					return nil, err
 				}
-				return err
 			}
-		}
-		updated, err := u.repo.Update(txCtx, params)
-		if err != nil {
-			return err
-		}
-		rule = updated
-		return nil
-	})
+			updated, err := u.repo.Update(txCtx, params)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return nil, ErrSurchargeRuleNotFound
+				}
+				return nil, err
+			}
+			return updated, nil
+		},
+	)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, ErrSurchargeRuleNotFound
-		}
 		return nil, err
 	}
 	item := serviceTransformer.ToSurchargeRuleItemDto(rule)

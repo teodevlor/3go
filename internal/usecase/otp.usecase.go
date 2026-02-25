@@ -35,7 +35,8 @@ type (
 )
 
 const (
-	OTPPurposeRegister       = "register"
+	OTPPurposeUserRegister   = "user_register"
+	OTPPurposeDriverRegister = "driver_register"
 	OTPPurposeResetPassword  = "reset_password"
 	OTPLength                = 6
 	OTPMaxAttempt            = 5
@@ -114,7 +115,7 @@ func (u *otpUsecase) ResendOTP(ctx context.Context, target string, purpose strin
 		return "", err
 	}
 
-	if purpose != OTPPurposeRegister {
+	if purpose != OTPPurposeUserRegister {
 		if err := u.ensureHasPreviousOTP(ctx, target, purpose); err != nil {
 			return "", err
 		}
@@ -141,34 +142,26 @@ func (u *otpUsecase) ResendOTP(ctx context.Context, target string, purpose strin
 }
 
 func (u *otpUsecase) VerifyOTP(ctx context.Context, target string, code string, purpose string, ip string, userAgent string) (bool, error) {
-	var verified bool
+	return database.WithTransaction(
+		u.txManager,
+		ctx,
+		func(txCtx context.Context) (bool, error) {
+			row, err := u.fetchActiveOTP(txCtx, target, purpose)
+			if err != nil {
+				return false, err
+			}
+			if row == nil {
+				return false, nil
+			}
 
-	err := u.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		row, err := u.fetchActiveOTP(txCtx, target, purpose)
-		if err != nil {
-			return err
-		}
+			attemptNumber := int(row.AttemptCount) + 1
+			if !u.isCodeMatched(row, code) {
+				return false, u.handleInvalidOTP(txCtx, row, attemptNumber, target, purpose, ip, userAgent)
+			}
 
-		if row == nil {
-			verified = false
-			return nil
-		}
-
-		attemptNumber := int(row.AttemptCount) + 1
-		if !u.isCodeMatched(row, code) {
-			verified = false
-			return u.handleInvalidOTP(txCtx, row, attemptNumber, target, purpose, ip, userAgent)
-		}
-
-		verified = true
-		return u.handleValidOTP(txCtx, row, attemptNumber, target, purpose, ip, userAgent)
-	})
-
-	if err != nil {
-		return false, err
-	}
-
-	return verified, nil
+			return true, u.handleValidOTP(txCtx, row, attemptNumber, target, purpose, ip, userAgent)
+		},
+	)
 }
 
 // Helpers
@@ -180,7 +173,6 @@ func (u *otpUsecase) resolveExpireDuration(cfg *setting.ResendOTPConfig) time.Du
 	return time.Duration(expireSec) * time.Second
 }
 
-// Dùng để chặn spam resend OTP cho những mục tiêu chưa từng yêu cầu OTP trước đó
 func (u *otpUsecase) ensureHasPreviousOTP(ctx context.Context, target, purpose string) error {
 	lastCreated, err := u.otpRepository.GetLastOTPCreatedAt(ctx, target, purpose)
 	if err != nil {
@@ -196,12 +188,12 @@ func (u *otpUsecase) defaultPurposeIfEmpty(purpose string) string {
 	purpose = strings.TrimSpace(strings.ToLower(purpose))
 
 	if purpose == "" {
-		return OTPPurposeRegister
+		return OTPPurposeUserRegister
 	}
 
 	switch purpose {
 	case "register":
-		return OTPPurposeRegister
+		return OTPPurposeUserRegister
 	case "forgot-password":
 		return OTPPurposeResetPassword
 	default:

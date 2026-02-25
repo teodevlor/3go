@@ -70,6 +70,28 @@ func (q *Queries) DeleteSidebar(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const getSidebarByContext = `-- name: GetSidebarByContext :one
+SELECT id, context, version, generated_at, items, created_at, updated_at, deleted_at
+FROM system_sidebars
+WHERE context = $1 AND deleted_at IS NULL
+`
+
+func (q *Queries) GetSidebarByContext(ctx context.Context, argContext string) (SystemSidebar, error) {
+	row := q.db.QueryRow(ctx, getSidebarByContext, argContext)
+	var i SystemSidebar
+	err := row.Scan(
+		&i.ID,
+		&i.Context,
+		&i.Version,
+		&i.GeneratedAt,
+		&i.Items,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const getSidebarByID = `-- name: GetSidebarByID :one
 SELECT id, context, version, generated_at, items, created_at, updated_at, deleted_at
 FROM system_sidebars

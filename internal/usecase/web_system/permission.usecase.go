@@ -16,6 +16,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 var (
@@ -54,26 +55,28 @@ func (u *permissionUsecase) Create(ctx context.Context, req *dto.CreatePermissio
 		return nil, nil
 	}
 	params := pgdb.CreatePermissionParams{
-		Resource:    req.Resource,
-		Action:      req.Action,
-		Name:        req.Name,
-		Description: req.Description,
+		Resource: req.Resource,
+		Action:   req.Action,
+		Name:     req.Name,
+		Description: pgtype.Text{
+			String: req.Description,
+			Valid:  req.Description != "",
+		},
 	}
-	var perm *websystem_model.Permission
-	err := u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		code := permissionCode(req.Resource, req.Action)
-		if _, err := u.repo.GetByCode(txCtx, code); err == nil {
-			return ErrPermissionCodeExists
-		} else if !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		created, err := u.repo.Create(txCtx, params)
-		if err != nil {
-			return err
-		}
-		perm = created
-		return nil
-	})
+
+	perm, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (*websystem_model.Permission, error) {
+			code := permissionCode(req.Resource, req.Action)
+			if _, err := u.repo.GetByCode(txCtx, code); err == nil {
+				return nil, ErrPermissionCodeExists
+			} else if !errors.Is(err, pgx.ErrNoRows) {
+				return nil, err
+			}
+			return u.repo.Create(txCtx, params)
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -149,33 +152,43 @@ func (u *permissionUsecase) Update(ctx context.Context, id uuid.UUID, req *dto.U
 	if u.repo == nil {
 		return nil, ErrPermissionNotFound
 	}
-	params := pgdb.UpdatePermissionParams{
-		ID:          id,
-		Resource:    *req.Resource,
-		Action:      *req.Action,
-		Name:        *req.Name,
-		Description: *req.Description,
+	desc := ""
+	if req.Description != nil {
+		desc = *req.Description
 	}
-	var perm *websystem_model.Permission
-	err := u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		code := permissionCode(*req.Resource, *req.Action)
-		existing, err := u.repo.GetByCode(txCtx, code)
-		if err == nil && existing.ID != id {
-			return ErrPermissionCodeExists
-		}
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		updated, err := u.repo.Update(txCtx, params)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrPermissionNotFound
+	params := pgdb.UpdatePermissionParams{
+		ID:       id,
+		Resource: *req.Resource,
+		Action:   *req.Action,
+		Name:     *req.Name,
+		Description: pgtype.Text{
+			String: desc,
+			Valid:  desc != "",
+		},
+	}
+
+	perm, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (*websystem_model.Permission, error) {
+			code := permissionCode(*req.Resource, *req.Action)
+			existing, err := u.repo.GetByCode(txCtx, code)
+			if err == nil && existing.ID != id {
+				return nil, ErrPermissionCodeExists
 			}
-			return err
-		}
-		perm = updated
-		return nil
-	})
+			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				return nil, err
+			}
+			updated, err := u.repo.Update(txCtx, params)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return nil, ErrPermissionNotFound
+				}
+				return nil, err
+			}
+			return updated, nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +200,12 @@ func (u *permissionUsecase) Delete(ctx context.Context, id uuid.UUID) error {
 	if u.repo == nil {
 		return ErrPermissionNotFound
 	}
-	return u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		return u.repo.Delete(txCtx, id)
-	})
+	_, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (struct{}, error) {
+			return struct{}{}, u.repo.Delete(txCtx, id)
+		},
+	)
+	return err
 }

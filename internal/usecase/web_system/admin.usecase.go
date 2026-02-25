@@ -111,25 +111,28 @@ func (u *adminUsecase) Create(ctx context.Context, req *dto.CreateAdminRequestDt
 		Department:   req.Department,
 		IsActive:     isActive,
 	}
-	var admin *model.SystemAdmin
-	err = u.transactionMgr.WithTransaction(ctx, func(txCtx context.Context) error {
-		if _, err := u.adminRepo.GetByEmail(txCtx, req.Email); err == nil {
-			return ErrAdminEmailUsed
-		} else if !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		created, err := u.adminRepo.Create(txCtx, params)
-		if err != nil {
-			return err
-		}
-		admin = created
-		if len(roleUUIDs) > 0 {
-			if err := u.adminRoleRepo.SetAdminRoles(txCtx, admin.ID, roleUUIDs, nil); err != nil {
-				return err
+
+	admin, err := database.WithTransaction(
+		u.transactionMgr,
+		ctx,
+		func(txCtx context.Context) (*model.SystemAdmin, error) {
+			if _, err := u.adminRepo.GetByEmail(txCtx, req.Email); err == nil {
+				return nil, ErrAdminEmailUsed
+			} else if !errors.Is(err, pgx.ErrNoRows) {
+				return nil, err
 			}
-		}
-		return nil
-	})
+			created, err := u.adminRepo.Create(txCtx, params)
+			if err != nil {
+				return nil, err
+			}
+			if len(roleUUIDs) > 0 {
+				if err := u.adminRoleRepo.SetAdminRoles(txCtx, created.ID, roleUUIDs, nil); err != nil {
+					return nil, err
+				}
+			}
+			return created, nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -215,28 +218,31 @@ func (u *adminUsecase) Update(ctx context.Context, id uuid.UUID, req *dto.Update
 		Department: *req.Department,
 		IsActive:   isActive,
 	}
-	var admin *model.SystemAdmin
-	err = u.transactionMgr.WithTransaction(ctx, func(txCtx context.Context) error {
-		existing, err := u.adminRepo.GetByEmail(txCtx, *req.Email)
-		if err == nil && existing.ID != id {
-			return ErrAdminEmailUsed
-		}
-		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		updated, err := u.adminRepo.Update(txCtx, params)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrAdminNotFound
+
+	admin, err := database.WithTransaction(
+		u.transactionMgr,
+		ctx,
+		func(txCtx context.Context) (*model.SystemAdmin, error) {
+			existing, err := u.adminRepo.GetByEmail(txCtx, *req.Email)
+			if err == nil && existing.ID != id {
+				return nil, ErrAdminEmailUsed
 			}
-			return err
-		}
-		admin = updated
-		if err := u.adminRoleRepo.SetAdminRoles(txCtx, id, roleUUIDs, nil); err != nil {
-			return err
-		}
-		return nil
-	})
+			if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+				return nil, err
+			}
+			updated, err := u.adminRepo.Update(txCtx, params)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return nil, ErrAdminNotFound
+				}
+				return nil, err
+			}
+			if err := u.adminRoleRepo.SetAdminRoles(txCtx, id, roleUUIDs, nil); err != nil {
+				return nil, err
+			}
+			return updated, nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -250,7 +256,12 @@ func (u *adminUsecase) Delete(ctx context.Context, id uuid.UUID) error {
 	if u.adminRepo == nil {
 		return ErrAdminNotFound
 	}
-	return u.transactionMgr.WithTransaction(ctx, func(txCtx context.Context) error {
-		return u.adminRepo.Delete(txCtx, id)
-	})
+	_, err := database.WithTransaction(
+		u.transactionMgr,
+		ctx,
+		func(txCtx context.Context) (struct{}, error) {
+			return struct{}{}, u.adminRepo.Delete(txCtx, id)
+		},
+	)
+	return err
 }

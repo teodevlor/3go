@@ -18,6 +18,7 @@ type (
 	SidebarController interface {
 		CreateSidebar(c *gin.Context) *common.ResponseData
 		GetSidebar(c *gin.Context) *common.ResponseData
+		GetSidebarByContext(c *gin.Context) *common.ResponseData
 		ListSidebars(c *gin.Context) *common.ResponseData
 		UpdateSidebar(c *gin.Context) *common.ResponseData
 		DeleteSidebar(c *gin.Context) *common.ResponseData
@@ -55,6 +56,21 @@ func (sc *sidebarController) GetSidebar(c *gin.Context) *common.ResponseData {
 		return common.ErrorResponse(common.StatusBadRequest, []string{"id không hợp lệ"})
 	}
 	result, err := sc.sidebarUsecase.GetSidebar(c.Request.Context(), id)
+	if err != nil {
+		if errors.Is(err, usecase.ErrSidebarNotFound) {
+			return common.ErrorResponse(common.StatusNotFound, []string{err.Error()})
+		}
+		return common.ErrorResponse(common.StatusInternalServerError, []string{err.Error()})
+	}
+	return common.SuccessResponse(common.StatusOK, result)
+}
+
+func (sc *sidebarController) GetSidebarByContext(c *gin.Context) *common.ResponseData {
+	sidebarContext := c.Param("context")
+	if sidebarContext == "" {
+		return common.ErrorResponse(common.StatusBadRequest, []string{"context không được để trống"})
+	}
+	result, err := sc.sidebarUsecase.GetSidebarByContext(c.Request.Context(), sidebarContext)
 	if err != nil {
 		if errors.Is(err, usecase.ErrSidebarNotFound) {
 			return common.ErrorResponse(common.StatusNotFound, []string{err.Error()})

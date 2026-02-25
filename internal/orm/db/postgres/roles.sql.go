@@ -26,7 +26,7 @@ func (q *Queries) CountRoles(ctx context.Context, dollar_1 string) (int64, error
 const createRole = `-- name: CreateRole :one
 INSERT INTO system_roles (code, name, description, is_active)
 VALUES ($1, $2, $3, $4)
-RETURNING id, code, name, description, is_active, created_at, updated_at
+RETURNING id, code, name, description, is_active, created_at, updated_at, deleted_at
 `
 
 type CreateRoleParams struct {
@@ -52,6 +52,7 @@ func (q *Queries) CreateRole(ctx context.Context, arg CreateRoleParams) (SystemR
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
@@ -67,7 +68,7 @@ func (q *Queries) DeleteRole(ctx context.Context, id uuid.UUID) error {
 }
 
 const getRoleByCode = `-- name: GetRoleByCode :one
-SELECT id, code, name, description, is_active, created_at, updated_at FROM system_roles
+SELECT id, code, name, description, is_active, created_at, updated_at, deleted_at FROM system_roles
 WHERE code = $1
 `
 
@@ -82,12 +83,13 @@ func (q *Queries) GetRoleByCode(ctx context.Context, code string) (SystemRole, e
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getRoleByID = `-- name: GetRoleByID :one
-SELECT id, code, name, description, is_active, created_at, updated_at FROM system_roles
+SELECT id, code, name, description, is_active, created_at, updated_at, deleted_at FROM system_roles
 WHERE id = $1
 `
 
@@ -102,12 +104,13 @@ func (q *Queries) GetRoleByID(ctx context.Context, id uuid.UUID) (SystemRole, er
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }
 
 const getRolesByIDs = `-- name: GetRolesByIDs :many
-SELECT id, code, name, description, is_active, created_at, updated_at FROM system_roles
+SELECT id, code, name, description, is_active, created_at, updated_at, deleted_at FROM system_roles
 WHERE id = ANY($1::uuid[])
 `
 
@@ -128,6 +131,7 @@ func (q *Queries) GetRolesByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]Sy
 			&i.IsActive,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -140,7 +144,7 @@ func (q *Queries) GetRolesByIDs(ctx context.Context, dollar_1 []uuid.UUID) ([]Sy
 }
 
 const listRoles = `-- name: ListRoles :many
-SELECT id, code, name, description, is_active, created_at, updated_at FROM system_roles
+SELECT id, code, name, description, is_active, created_at, updated_at, deleted_at FROM system_roles
 WHERE ($1::text = '' OR code ILIKE '%' || $1 || '%' OR name ILIKE '%' || $1 || '%')
 ORDER BY created_at DESC
 LIMIT $2 OFFSET $3
@@ -169,6 +173,7 @@ func (q *Queries) ListRoles(ctx context.Context, arg ListRolesParams) ([]SystemR
 			&i.IsActive,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.DeletedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -189,7 +194,7 @@ SET
     is_active = $5,
     updated_at = CURRENT_TIMESTAMP
 WHERE id = $1
-RETURNING id, code, name, description, is_active, created_at, updated_at
+RETURNING id, code, name, description, is_active, created_at, updated_at, deleted_at
 `
 
 type UpdateRoleParams struct {
@@ -217,6 +222,7 @@ func (q *Queries) UpdateRole(ctx context.Context, arg UpdateRoleParams) (SystemR
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.DeletedAt,
 	)
 	return i, err
 }

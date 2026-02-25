@@ -70,58 +70,57 @@ func NewAuthAdminUsecase(
 }
 
 func (u *authAdminUsecase) LoginAdmin(ctx context.Context, req *websystemdto.AdminLoginRequestDto, ip string, userAgent string) (*websystemdto.AdminLoginResponseDto, error) {
-	var (
+	type txResult struct {
 		admin        *model.SystemAdmin
 		refreshToken string
+	}
+
+	res, err := database.WithTransaction(
+		u.txManager,
+		ctx,
+		func(txCtx context.Context) (txResult, error) {
+			admin, err := u.getAdminForLogin(txCtx, req.Email, req.Password)
+			if err != nil {
+				_ = u.logLoginHistory(txCtx, uuid.Nil, ip, userAgent, err, req.Email)
+				return txResult{}, err
+			}
+
+			refreshToken := generate.GenerateRandomString(64)
+			expiresAt := time.Now().Add(refreshTokenTTL)
+
+			_, err = u.refreshTokenRepo.CreateRefreshToken(txCtx, &model.SystemAdminRefreshToken{
+				AdminID:          admin.ID,
+				RefreshTokenHash: refreshToken,
+				ExpiresAt:        expiresAt,
+				IpAddress:        ip,
+				UserAgent:        userAgent,
+			})
+			if err != nil {
+				return txResult{}, err
+			}
+
+			if err := u.adminRepo.UpdateLastLoginAt(txCtx, admin.ID); err != nil {
+				return txResult{}, err
+			}
+
+			if err := u.logLoginHistory(txCtx, admin.ID, ip, userAgent, nil, ""); err != nil {
+				return txResult{}, err
+			}
+
+			return txResult{admin: admin, refreshToken: refreshToken}, nil
+		},
 	)
-
-	err := u.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		var err error
-		admin, err = u.getAdminForLogin(txCtx, req.Email, req.Password)
-		if err != nil {
-			_ = u.logLoginHistory(txCtx, uuid.Nil, ip, userAgent, err, req.Email)
-			return err
-		}
-
-		// Tạo refresh token và lưu vào database
-		refreshToken = generate.GenerateRandomString(64)
-		expiresAt := time.Now().Add(refreshTokenTTL)
-
-		_, err = u.refreshTokenRepo.CreateRefreshToken(txCtx, &model.SystemAdminRefreshToken{
-			AdminID:          admin.ID,
-			RefreshTokenHash: refreshToken,
-			ExpiresAt:        expiresAt,
-			IpAddress:        ip,
-			UserAgent:        userAgent,
-		})
-		if err != nil {
-			return err
-		}
-
-		// Cập nhật last_login_at
-		if err := u.adminRepo.UpdateLastLoginAt(txCtx, admin.ID); err != nil {
-			return err
-		}
-
-		// Log login history thành công
-		if err := u.logLoginHistory(txCtx, admin.ID, ip, userAgent, nil, ""); err != nil {
-			return err
-		}
-
-		return nil
-	})
 	if err != nil {
 		return nil, err
 	}
 
-	// Tạo access token với admin_id
-	accessToken, err := jwtutil.GenerateAdminAccessToken(admin.ID)
+	accessToken, accessTokenExpiresAt, err := jwtutil.GenerateAdminAccessToken(res.admin.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	roles, permissions := u.getAdminRolesAndPermissions(ctx, admin.ID)
-	resp := websystemtransformer.ToAdminLoginResponseDto(accessToken, refreshToken, admin, roles, permissions)
+	roles, permissions := u.getAdminRolesAndPermissions(ctx, res.admin.ID)
+	resp := websystemtransformer.ToAdminLoginResponseDto(accessToken, res.refreshToken, accessTokenExpiresAt, res.admin, roles, permissions)
 	return &resp, nil
 }
 
@@ -173,15 +172,12 @@ func (u *authAdminUsecase) getAdminForLogin(ctx context.Context, email string, p
 	if admin == nil {
 		return nil, ErrAdminNotFound
 	}
-
 	if ok := validator.CheckPassword(password, admin.PasswordHash); !ok {
 		return nil, ErrAdminInvalidPassword
 	}
-
 	if !admin.IsActive {
 		return nil, ErrAdminNotActive
 	}
-
 	return admin, nil
 }
 
@@ -230,67 +226,63 @@ func (u *authAdminUsecase) logLoginHistory(
 }
 
 func (u *authAdminUsecase) RefreshToken(ctx context.Context, refreshToken string, ip string, userAgent string) (*websystemdto.AdminRefreshTokenResponseDto, error) {
-	var (
+	type txResult struct {
 		admin      *model.SystemAdmin
 		newRefresh string
 		newAccess  string
+	}
+
+	res, err := database.WithTransaction(
+		u.txManager,
+		ctx,
+		func(txCtx context.Context) (txResult, error) {
+			tokenRecord, err := u.refreshTokenRepo.GetRefreshTokenByHash(txCtx, refreshToken)
+			if err != nil || tokenRecord == nil {
+				return txResult{}, ErrInvalidRefreshToken
+			}
+
+			now := time.Now()
+			if tokenRecord.IsRevoked || now.After(tokenRecord.ExpiresAt) {
+				_ = u.refreshTokenRepo.RevokeRefreshTokenByHash(txCtx, refreshToken, "expired_or_revoked")
+				return txResult{}, ErrInvalidRefreshToken
+			}
+
+			admin, err := u.adminRepo.GetByID(txCtx, tokenRecord.AdminID)
+			if err != nil || admin == nil {
+				return txResult{}, ErrAdminNotFound
+			}
+			if !admin.IsActive {
+				return txResult{}, ErrAdminNotActive
+			}
+
+			if err := u.refreshTokenRepo.RevokeRefreshTokenByHash(txCtx, refreshToken, "rotated"); err != nil {
+				return txResult{}, err
+			}
+
+			newRefresh := generate.GenerateRandomString(64)
+			_, err = u.refreshTokenRepo.CreateRefreshToken(txCtx, &model.SystemAdminRefreshToken{
+				AdminID:          admin.ID,
+				RefreshTokenHash: newRefresh,
+				ExpiresAt:        now.Add(refreshTokenTTL),
+				IpAddress:        ip,
+				UserAgent:        userAgent,
+			})
+			if err != nil {
+				return txResult{}, err
+			}
+
+			newAccess, _, err := jwtutil.GenerateAdminAccessToken(admin.ID)
+			if err != nil {
+				return txResult{}, err
+			}
+
+			return txResult{admin: admin, newRefresh: newRefresh, newAccess: newAccess}, nil
+		},
 	)
-
-	err := u.txManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		// Lấy refresh token từ database
-		tokenRecord, err := u.refreshTokenRepo.GetRefreshTokenByHash(txCtx, refreshToken)
-		if err != nil || tokenRecord == nil {
-			return ErrInvalidRefreshToken
-		}
-
-		// Kiểm tra token đã bị revoke hoặc hết hạn
-		now := time.Now()
-		if tokenRecord.IsRevoked || now.After(tokenRecord.ExpiresAt) {
-			_ = u.refreshTokenRepo.RevokeRefreshTokenByHash(txCtx, refreshToken, "expired_or_revoked")
-			return ErrInvalidRefreshToken
-		}
-
-		// Lấy thông tin admin
-		admin, err = u.adminRepo.GetByID(txCtx, tokenRecord.AdminID)
-		if err != nil || admin == nil {
-			return ErrAdminNotFound
-		}
-		if !admin.IsActive {
-			return ErrAdminNotActive
-		}
-
-		// Revoke token cũ
-		if err := u.refreshTokenRepo.RevokeRefreshTokenByHash(txCtx, refreshToken, "rotated"); err != nil {
-			return err
-		}
-
-		// Tạo refresh token mới
-		newRefresh = generate.GenerateRandomString(64)
-		newExpiresAt := now.Add(refreshTokenTTL)
-
-		_, err = u.refreshTokenRepo.CreateRefreshToken(txCtx, &model.SystemAdminRefreshToken{
-			AdminID:          admin.ID,
-			RefreshTokenHash: newRefresh,
-			ExpiresAt:        newExpiresAt,
-			IpAddress:        ip,
-			UserAgent:        userAgent,
-		})
-		if err != nil {
-			return err
-		}
-
-		// Tạo access token mới với admin_id
-		newAccess, err = jwtutil.GenerateAdminAccessToken(admin.ID)
-		if err != nil {
-			return err
-		}
-
-		return nil
-	})
 	if err != nil {
 		return nil, err
 	}
 
-	resp := websystemtransformer.ToAdminRefreshTokenResponseDto(newAccess, newRefresh)
+	resp := websystemtransformer.ToAdminRefreshTokenResponseDto(res.newAccess, res.newRefresh)
 	return &resp, nil
 }

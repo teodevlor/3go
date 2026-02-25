@@ -1,11 +1,20 @@
 server:
   port: 8080
   mode: "dev"
+# db_postgre:
+#   host: postgres
+#   port: 5432
+#   user: postgres
+#   password: postgres
+#   dbname: gogogo
+#   maxIdleConns: 10
+#   maxOpenConns: 100
+#   connMaxLifetime: 3600
 db_postgre:
-  host: postgres
-  port: 5432
-  user: postgres
-  password: postgres
+  host: 103.90.226.96
+  port: 5439
+  user: user_postgres
+  password: password_postgres
   dbname: gogogo
   maxIdleConns: 10
   maxOpenConns: 100

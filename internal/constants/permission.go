@@ -63,4 +63,18 @@ const (
 	PermissionPermissionRead   = "PERMISSION.READ"
 	PermissionPermissionUpdate = "PERMISSION.UPDATE"
 	PermissionPermissionDelete = "PERMISSION.DELETE"
+
+	// Driver document type
+	PermissionDriverDocumentTypeCreate = "DRIVER_DOCUMENT_TYPE.CREATE"
+	PermissionDriverDocumentTypeList   = "DRIVER_DOCUMENT_TYPE.LIST"
+	PermissionDriverDocumentTypeRead   = "DRIVER_DOCUMENT_TYPE.READ"
+	PermissionDriverDocumentTypeUpdate = "DRIVER_DOCUMENT_TYPE.UPDATE"
+	PermissionDriverDocumentTypeDelete = "DRIVER_DOCUMENT_TYPE.DELETE"
+
+	// Driver document
+	PermissionDriverDocumentCreate   = "DRIVER_DOCUMENT.CREATE"
+	PermissionDriverDocumentList     = "DRIVER_DOCUMENT.LIST"
+	PermissionDriverDocumentRead     = "DRIVER_DOCUMENT.READ"
+	PermissionDriverDocumentUpdate   = "DRIVER_DOCUMENT.UPDATE"
+	PermissionDriverDocumentDelete   = "DRIVER_DOCUMENT.DELETE"
 )

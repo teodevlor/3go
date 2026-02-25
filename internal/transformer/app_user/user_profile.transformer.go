@@ -20,10 +20,12 @@ func ToUserProfileResponse(account *model.Account, userProfile *model.UserProfil
 }
 
 func ToLoginResponseDto(accessToken, refreshToken string, account *model.Account, userProfile *model.UserProfile) dto.UserLoginResponseDto {
+	profile := ToUserProfileResponse(account, userProfile)
 	return dto.UserLoginResponseDto{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		UserProfile:  ToUserProfileResponse(account, userProfile),
+		RequireVerifyOtp: false,
+		AccessToken:      accessToken,
+		RefreshToken:     refreshToken,
+		UserProfile:      &profile,
 	}
 }
 

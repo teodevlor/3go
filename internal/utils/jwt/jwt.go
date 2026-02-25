@@ -45,29 +45,32 @@ func GenerateAccessToken(accountID uuid.UUID) (string, error) {
 	return token.SignedString([]byte(secret))
 }
 
-func GenerateAdminAccessToken(adminID uuid.UUID) (string, error) {
+func GenerateAdminAccessToken(adminID uuid.UUID) (token string, expiresAt time.Time, err error) {
 	secret := global.Config.JwtConfig.Secret
 
-	ttlStr := global.Config.JwtConfig.AccessTokenTtl
-	if ttlStr == "" {
-		ttlStr = "15m"
-	}
+	// ttlStr := global.Config.JwtConfig.AccessTokenTtl
+	// if ttlStr == "" {
+	// 	ttlStr = "15m"
+	// }
 
-	ttl, err := time.ParseDuration(ttlStr)
-	if err != nil {
-		ttl = 15 * time.Minute
-	}
+	// ttl, parseErr := time.ParseDuration(ttlStr)
+	// if parseErr != nil {
+	// 	ttl = 15 * time.Minute
+	// }
+	ttl := 10 * time.Hour
 
+	expiresAt = time.Now().Add(ttl)
 	claims := AdminClaims{
 		AdminID: adminID.String(),
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(ttl)),
+			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(secret))
+	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	token, err = t.SignedString([]byte(secret))
+	return token, expiresAt, err
 }
 
 func ParseAccessToken(tokenStr string) (uuid.UUID, error) {

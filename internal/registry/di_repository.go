@@ -2,6 +2,7 @@ package registry
 
 import (
 	account_repo "go-structure/internal/repository"
+	app_driver_repo "go-structure/internal/repository/app_driver"
 	user_profile_repo "go-structure/internal/repository/app_user"
 	setting_repo "go-structure/internal/repository/web_system"
 
@@ -24,6 +25,7 @@ const (
 	ServiceRepoDIName             = "service_repo_di"
 	ServiceZoneRepoDIName         = "service_zone_repo_di"
 	DistancePricingRuleRepoDIName = "distance_pricing_rule_repo_di"
+	SurchargeConditionRepoDIName  = "surcharge_condition_repo_di"
 	SurchargeRuleRepoDIName       = "surcharge_rule_repo_di"
 	PackageSizePricingRepoDIName  = "package_size_pricing_repo_di"
 	SystemAdminRepoDIName                = "system_admin_repo_di"
@@ -33,6 +35,9 @@ const (
 	SystemAdminRoleRepoDIName            = "system_admin_role_repo_di"
 	PermissionRepoDIName                 = "permission_repo_di"
 	RolePermissionRepoDIName             = "role_permission_repo_di"
+	DriverDocumentTypeRepoDIName         = "driver_document_type_repo_di"
+	DriverProfileRepoDIName              = "driver_profile_repo_di"
+	DriverDocumentRepoDIName              = "driver_document_repo_di"
 )
 
 func buildRepositories() error {
@@ -162,6 +167,15 @@ func buildRepositories() error {
 		},
 	}
 
+	surchargeConditionDef := di.Def{
+		Name:  SurchargeConditionRepoDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			pool := ctn.Get(PostgresPoolDIName).(*pgxpool.Pool)
+			return setting_repo.NewSurchargeConditionRepository(pool), nil
+		},
+	}
+
 	surchargeRuleDef := di.Def{
 		Name:  SurchargeRuleRepoDIName,
 		Scope: di.App,
@@ -243,6 +257,33 @@ func buildRepositories() error {
 		},
 	}
 
+	driverDocumentTypeDef := di.Def{
+		Name:  DriverDocumentTypeRepoDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			pool := ctn.Get(PostgresPoolDIName).(*pgxpool.Pool)
+			return app_driver_repo.NewDriverDocumentTypeRepository(pool), nil
+		},
+	}
+
+	driverProfileDef := di.Def{
+		Name:  DriverProfileRepoDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			pool := ctn.Get(PostgresPoolDIName).(*pgxpool.Pool)
+			return app_driver_repo.NewDriverProfileRepository(pool), nil
+		},
+	}
+
+	driverDocumentDef := di.Def{
+		Name:  DriverDocumentRepoDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			pool := ctn.Get(PostgresPoolDIName).(*pgxpool.Pool)
+			return app_driver_repo.NewDriverDocumentRepository(pool), nil
+		},
+	}
+
 	return builder.Add(
 		userProfileDef,
 		accountDef,
@@ -258,6 +299,7 @@ func buildRepositories() error {
 		serviceDef,
 		serviceZoneDef,
 		distancePricingRuleDef,
+		surchargeConditionDef,
 		surchargeRuleDef,
 		packageSizePricingDef,
 		systemAdminDef,
@@ -267,5 +309,8 @@ func buildRepositories() error {
 		systemAdminRoleDef,
 		permissionDef,
 		rolePermissionDef,
+		driverDocumentTypeDef,
+		driverProfileDef,
+		driverDocumentDef,
 	)
 }

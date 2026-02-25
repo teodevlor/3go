@@ -5,13 +5,16 @@ import (
 	"go-structure/internal/adapter/storage"
 	"go-structure/internal/helper/database"
 	account_repo "go-structure/internal/repository"
+	app_driver_repo "go-structure/internal/repository/app_driver"
 	user_profile_repo "go-structure/internal/repository/app_user"
 	settingRepository "go-structure/internal/repository/web_system"
 	usecase_pkg "go-structure/internal/usecase"
+	app_driver_usecase "go-structure/internal/usecase/app_driver"
 	user_profile_usecase "go-structure/internal/usecase/app_user"
 	websystem_usecase "go-structure/internal/usecase/web_system"
 
 	"github.com/sarulabs/di"
+	"github.com/redis/go-redis/v9"
 )
 
 const (
@@ -25,12 +28,16 @@ const (
 	ServiceUsecaseDIName             = "service_usecase_di"
 	ServiceZoneUsecaseDIName         = "service_zone_usecase_di"
 	DistancePricingRuleUsecaseDIName = "distance_pricing_rule_usecase_di"
+	SurchargeConditionUsecaseDIName  = "surcharge_condition_usecase_di"
 	SurchargeRuleUsecaseDIName       = "surcharge_rule_usecase_di"
 	PackageSizePricingUsecaseDIName  = "package_size_pricing_usecase_di"
 	AuthAdminUsecaseDIName           = "auth_admin_usecase_di"
 	RoleUsecaseDIName                = "role_usecase_di"
 	AdminUsecaseDIName               = "admin_usecase_di"
 	PermissionUsecaseDIName          = "permission_usecase_di"
+	DriverDocumentTypeUsecaseDIName  = "driver_document_type_usecase_di"
+	DriverProfileUsecaseDIName       = "driver_profile_usecase_di"
+	DriverDocumentUsecaseDIName      = "driver_document_usecase_di"
 )
 
 func buildUsecases() error {
@@ -162,6 +169,16 @@ func buildUsecases() error {
 		},
 	}
 
+	surchargeConditionDef := di.Def{
+		Name:  SurchargeConditionUsecaseDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			repo := ctn.Get(SurchargeConditionRepoDIName).(settingRepository.ISurchargeConditionRepository)
+			transactionManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
+			return websystem_usecase.NewSurchargeConditionUsecase(repo, transactionManager), nil
+		},
+	}
+
 	surchargeRuleDef := di.Def{
 		Name:  SurchargeRuleUsecaseDIName,
 		Scope: di.App,
@@ -234,6 +251,52 @@ func buildUsecases() error {
 		},
 	}
 
+	driverDocumentTypeUsecaseDef := di.Def{
+		Name:  DriverDocumentTypeUsecaseDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			repo := ctn.Get(DriverDocumentTypeRepoDIName).(app_driver_repo.IDriverDocumentTypeRepository)
+			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
+			return app_driver_usecase.NewDriverDocumentTypeUsecase(repo, txManager), nil
+		},
+	}
+
+	driverProfileUsecaseDef := di.Def{
+		Name:  DriverProfileUsecaseDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			driverProfileRepo := ctn.Get(DriverProfileRepoDIName).(app_driver_repo.IDriverProfileRepository)
+			accountRepo := ctn.Get(AccountRepoDIName).(account_repo.IAccountRepository)
+			deviceRepo := ctn.Get(DeviceRepoDIName).(account_repo.IDeviceRepository)
+			accountAppDeviceRepo := ctn.Get(AccountAppDeviceRepoDIName).(account_repo.IAccountAppDeviceRepository)
+			sessionRepo := ctn.Get(SessionRepoDIName).(account_repo.ISessionRepository)
+			loginHistoryRepo := ctn.Get(LoginHistoryRepoDIName).(account_repo.ILoginHistoryRepository)
+			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
+			otpUcAny := ctn.Get(OTPUsecaseDIName)
+			var otpUc usecase_pkg.IOTPUsecase
+			if otpUcAny != nil {
+				otpUc = otpUcAny.(usecase_pkg.IOTPUsecase)
+			}
+			notifyUcAny := ctn.Get(NotifyUsecaseDIName)
+			var notifyUc usecase_pkg.INotifyUsecase
+			if notifyUcAny != nil {
+				notifyUc = notifyUcAny.(usecase_pkg.INotifyUsecase)
+			}
+			redisClient := ctn.Get(RedisClientDIName).(*redis.Client)
+			return app_driver_usecase.NewDriverProfileUsecase(driverProfileRepo, accountRepo, deviceRepo, accountAppDeviceRepo, sessionRepo, loginHistoryRepo, otpUc, notifyUc, txManager, redisClient), nil
+		},
+	}
+
+	driverDocumentUsecaseDef := di.Def{
+		Name:  DriverDocumentUsecaseDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			driverDocumentRepo := ctn.Get(DriverDocumentRepoDIName).(app_driver_repo.IDriverDocumentRepository)
+			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
+			return app_driver_usecase.NewDriverDocumentUsecase(driverDocumentRepo, txManager), nil
+		},
+	}
+
 	storageDef := di.Def{
 		Name:  StorageUsecaseDIName,
 		Scope: di.App,
@@ -253,12 +316,16 @@ func buildUsecases() error {
 		serviceZoneDef,
 		serviceDef,
 		distancePricingRuleDef,
+		surchargeConditionDef,
 		surchargeRuleDef,
 		packageSizePricingDef,
 		authAdminDef,
 		roleDef,
 		adminDef,
 		permissionDef,
+		driverDocumentTypeUsecaseDef,
+		driverProfileUsecaseDef,
+		driverDocumentUsecaseDef,
 		storageDef,
 	)
 }

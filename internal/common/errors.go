@@ -5,7 +5,6 @@ import (
 	"go-structure/internal/constants"
 )
 
-// Sentinel errors dùng cho resend OTP (usecase trả về, controller so sánh errors.Is).
 var (
 	ErrResendTooSoon     = errors.New(constants.BaseMessageResendOTPTooSoon)
 	ErrResendMaxExceeded = errors.New(constants.BaseMessageResendOTPMaxExceeded)

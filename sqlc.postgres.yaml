@@ -7,6 +7,7 @@ sql:
     queries:
       - internal/orm/postgres/queries
       - internal/orm/postgres/queries/web_system
+      - internal/orm/postgres/queries/app_driver
     gen:
       go:
         package: "pgdb"
@@ -26,3 +27,10 @@ sql:
             go_type: "string"
           - column: "system_roles.description"
             go_type: "string"
+          - column: "driver_document_types.description"
+            go_type: "string"
+          - column: "driver_document_types.service_id"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+              pointer: true

@@ -1,6 +1,8 @@
 package web_system
 
 import (
+	"time"
+
 	websystemdto "go-structure/internal/dto/web_system"
 	"go-structure/internal/repository/model"
 	websystem "go-structure/internal/repository/model/web_system"
@@ -8,7 +10,6 @@ import (
 	"github.com/google/uuid"
 )
 
-// GetUniquePermissionIDs gộp toàn bộ permission ID từ permMap (roleID -> permissionIDs), bỏ trùng.
 func GetUniquePermissionIDs(permMap map[uuid.UUID][]uuid.UUID) []uuid.UUID {
 	if len(permMap) == 0 {
 		return nil
@@ -26,7 +27,6 @@ func GetUniquePermissionIDs(permMap map[uuid.UUID][]uuid.UUID) []uuid.UUID {
 	return out
 }
 
-// ToAdminRolesAndPermissionsDtos build RoleItemDto và PermissionItemDto từ dữ liệu roles, permMap, permissions.
 func ToAdminRolesAndPermissionsDtos(
 	roles []*websystem.Role,
 	permMap map[uuid.UUID][]uuid.UUID,
@@ -48,15 +48,23 @@ func ToAdminRolesAndPermissionsDtos(
 func ToAdminLoginResponseDto(
 	accessToken string,
 	refreshToken string,
+	accessTokenExpiresAt time.Time,
 	admin *model.SystemAdmin,
 	roles []websystemdto.RoleItemDto,
 	permissions []websystemdto.PermissionItemDto,
 ) websystemdto.AdminLoginResponseDto {
 	roleSimples := toAdminRoleSimpleDtos(roles)
 	permSimples := toAdminPermissionSimpleDtos(permissions)
+	now := time.Now()
+	expiresIn := int64(0)
+	if accessTokenExpiresAt.After(now) {
+		expiresIn = int64(accessTokenExpiresAt.Sub(now).Seconds())
+	}
 	return websystemdto.AdminLoginResponseDto{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
+		ExpiresIn:    expiresIn,
+		ExpiredAt:    accessTokenExpiresAt.UTC().Format(time.RFC3339),
 		Admin: websystemdto.AdminProfileResponseDto{
 			ID:          admin.ID,
 			Email:       admin.Email,

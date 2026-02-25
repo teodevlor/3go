@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS driver_profiles (
 
     global_status driver_profile_status NOT NULL DEFAULT 'PENDING_PROFILE',
 
-    rating numeric(3,2) DEFAULT 5.0,
+    rating numeric(3,2) DEFAULT 0,
     total_completed_orders integer DEFAULT 0,
 
     created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,

@@ -12,14 +12,15 @@ func ToSurchargeRuleFromRow(row *pgdb.SystemSurchargeRule) *websystem.SurchargeR
 		return nil
 	}
 	return &websystem.SurchargeRule{
-		ID:            row.ID,
-		ServiceID:     row.ServiceID,
-		ZoneID:        row.ZoneID,
-		SurchargeType: row.SurchargeType,
-		Amount:        common.NumericToFloat64(row.Amount),
-		Unit:          row.Unit,
-		Condition:     row.Condition,
-		IsActive:      row.IsActive,
+		ID:        row.ID,
+		ServiceID: row.ServiceID,
+		ZoneID:    row.ZoneID,
+		Amount:    common.NumericToFloat64(row.Amount),
+		Unit:      row.Unit,
+		IsActive:  row.IsActive,
+		Priority:  row.Priority,
+		CreatedBy: row.CreatedBy,
+		UpdatedBy: row.UpdatedBy,
 		BaseModel: model.BaseModel{
 			CreatedAt: row.CreatedAt.Time,
 			UpdatedAt: row.UpdatedAt.Time,

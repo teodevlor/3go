@@ -5,11 +5,12 @@ import (
 	websystem "go-structure/internal/repository/model/web_system"
 )
 
-func ToDistancePricingRuleItemDto(r *websystem.DistancePricingRule) dto.DistancePricingRuleItemDto {
+// ToDistancePricingRuleItemDtoWithService map rule sang DTO và gắn thêm service (name, code) nếu có.
+func ToDistancePricingRuleItemDtoWithService(r *websystem.DistancePricingRule, svc *websystem.Service) dto.DistancePricingRuleItemDto {
 	if r == nil {
 		return dto.DistancePricingRuleItemDto{}
 	}
-	return dto.DistancePricingRuleItemDto{
+	out := dto.DistancePricingRuleItemDto{
 		ID:         r.ID.String(),
 		ServiceID:  r.ServiceID.String(),
 		FromKm:     r.FromKm,
@@ -17,4 +18,11 @@ func ToDistancePricingRuleItemDto(r *websystem.DistancePricingRule) dto.Distance
 		PricePerKm: r.PricePerKm,
 		IsActive:   r.IsActive,
 	}
+	if svc != nil {
+		out.Service = &dto.DistancePricingRuleServiceDto{
+			Name: svc.Name,
+			Code: svc.Code,
+		}
+	}
+	return out
 }

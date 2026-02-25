@@ -2,10 +2,12 @@ package registry
 
 import (
 	"go-structure/config"
+	app_driver_controller "go-structure/internal/controller/app_driver"
 	otpcontroller "go-structure/internal/controller"
 	controller "go-structure/internal/controller/app_user"
 	websystem_controller "go-structure/internal/controller/web_system"
 	usecase_pkg "go-structure/internal/usecase"
+	app_driver_usecase "go-structure/internal/usecase/app_driver"
 	usecase "go-structure/internal/usecase/app_user"
 	websystem_usecase "go-structure/internal/usecase/web_system"
 
@@ -20,12 +22,16 @@ const (
 	SidebarControllerDIName             = "sidebar_controller_di"
 	ServiceControllerDIName             = "service_controller_di"
 	DistancePricingRuleControllerDIName = "distance_pricing_rule_controller_di"
+	SurchargeConditionControllerDIName  = "surcharge_condition_controller_di"
 	SurchargeRuleControllerDIName       = "surcharge_rule_controller_di"
 	PackageSizePricingControllerDIName  = "package_size_pricing_controller_di"
 	AuthAdminControllerDIName           = "auth_admin_controller_di"
 	RoleControllerDIName                = "role_controller_di"
 	AdminControllerDIName               = "admin_controller_di"
 	PermissionControllerDIName          = "permission_controller_di"
+	DriverDocumentTypeControllerDIName  = "driver_document_type_controller_di"
+	DriverProfileControllerDIName       = "driver_profile_controller_di"
+	DriverDocumentControllerDIName      = "driver_document_controller_di"
 )
 
 func buildControllers() error {
@@ -93,6 +99,15 @@ func buildControllers() error {
 		},
 	}
 
+	surchargeConditionDef := di.Def{
+		Name:  SurchargeConditionControllerDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			uc := ctn.Get(SurchargeConditionUsecaseDIName).(websystem_usecase.ISurchargeConditionUsecase)
+			return websystem_controller.NewSurchargeConditionController(uc), nil
+		},
+	}
+
 	surchargeRuleDef := di.Def{
 		Name:  SurchargeRuleControllerDIName,
 		Scope: di.App,
@@ -147,6 +162,33 @@ func buildControllers() error {
 		},
 	}
 
+	driverDocumentTypeDef := di.Def{
+		Name:  DriverDocumentTypeControllerDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			uc := ctn.Get(DriverDocumentTypeUsecaseDIName).(app_driver_usecase.IDriverDocumentTypeUsecase)
+			return app_driver_controller.NewDriverDocumentTypeController(uc), nil
+		},
+	}
+
+	driverProfileDef := di.Def{
+		Name:  DriverProfileControllerDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			uc := ctn.Get(DriverProfileUsecaseDIName).(app_driver_usecase.IDriverProfileUsecase)
+			return app_driver_controller.NewDriverProfileController(uc), nil
+		},
+	}
+
+	driverDocumentDef := di.Def{
+		Name:  DriverDocumentControllerDIName,
+		Scope: di.App,
+		Build: func(ctn di.Container) (interface{}, error) {
+			uc := ctn.Get(DriverDocumentUsecaseDIName).(app_driver_usecase.IDriverDocumentUsecase)
+			return app_driver_controller.NewDriverDocumentController(uc), nil
+		},
+	}
+
 	return builder.Add(
 		userProfileDef,
 		otpDef,
@@ -155,11 +197,15 @@ func buildControllers() error {
 		sidebarDef,
 		serviceDef,
 		distancePricingRuleDef,
+		surchargeConditionDef,
 		surchargeRuleDef,
 		packageSizePricingDef,
 		authAdminDef,
 		roleDef,
 		adminDef,
 		permissionDef,
+		driverDocumentTypeDef,
+		driverProfileDef,
+		driverDocumentDef,
 	)
 }

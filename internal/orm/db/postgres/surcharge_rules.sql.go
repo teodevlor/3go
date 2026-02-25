@@ -13,44 +13,47 @@ import (
 )
 
 const createSurchargeRule = `-- name: CreateSurchargeRule :one
-INSERT INTO system_surcharge_rules (service_id, zone_id, surcharge_type, amount, unit, condition, is_active)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, service_id, zone_id, surcharge_type, amount, unit, condition, is_active, created_at, updated_at, deleted_at
+INSERT INTO system_surcharge_rules (service_id, zone_id, amount, unit, is_active, priority, created_by, updated_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, service_id, zone_id, amount, unit, is_active, created_at, updated_at, deleted_at, priority, created_by, updated_by
 `
 
 type CreateSurchargeRuleParams struct {
-	ServiceID     uuid.UUID      `json:"service_id"`
-	ZoneID        uuid.UUID      `json:"zone_id"`
-	SurchargeType string         `json:"surcharge_type"`
-	Amount        pgtype.Numeric `json:"amount"`
-	Unit          string         `json:"unit"`
-	Condition     []byte         `json:"condition"`
-	IsActive      bool           `json:"is_active"`
+	ServiceID uuid.UUID      `json:"service_id"`
+	ZoneID    uuid.UUID      `json:"zone_id"`
+	Amount    pgtype.Numeric `json:"amount"`
+	Unit      string         `json:"unit"`
+	IsActive  bool           `json:"is_active"`
+	Priority  int32          `json:"priority"`
+	CreatedBy uuid.UUID      `json:"created_by"`
+	UpdatedBy uuid.UUID      `json:"updated_by"`
 }
 
 func (q *Queries) CreateSurchargeRule(ctx context.Context, arg CreateSurchargeRuleParams) (SystemSurchargeRule, error) {
 	row := q.db.QueryRow(ctx, createSurchargeRule,
 		arg.ServiceID,
 		arg.ZoneID,
-		arg.SurchargeType,
 		arg.Amount,
 		arg.Unit,
-		arg.Condition,
 		arg.IsActive,
+		arg.Priority,
+		arg.CreatedBy,
+		arg.UpdatedBy,
 	)
 	var i SystemSurchargeRule
 	err := row.Scan(
 		&i.ID,
 		&i.ServiceID,
 		&i.ZoneID,
-		&i.SurchargeType,
 		&i.Amount,
 		&i.Unit,
-		&i.Condition,
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.Priority,
+		&i.CreatedBy,
+		&i.UpdatedBy,
 	)
 	return i, err
 }
@@ -67,7 +70,8 @@ func (q *Queries) DeleteSurchargeRule(ctx context.Context, id uuid.UUID) error {
 }
 
 const getSurchargeRuleByID = `-- name: GetSurchargeRuleByID :one
-SELECT id, service_id, zone_id, surcharge_type, amount, unit, condition, is_active, created_at, updated_at, deleted_at FROM system_surcharge_rules
+SELECT id, service_id, zone_id, amount, unit, is_active, created_at, updated_at, deleted_at, priority, created_by, updated_by
+FROM system_surcharge_rules
 WHERE id = $1 AND deleted_at IS NULL
 `
 
@@ -78,20 +82,22 @@ func (q *Queries) GetSurchargeRuleByID(ctx context.Context, id uuid.UUID) (Syste
 		&i.ID,
 		&i.ServiceID,
 		&i.ZoneID,
-		&i.SurchargeType,
 		&i.Amount,
 		&i.Unit,
-		&i.Condition,
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.Priority,
+		&i.CreatedBy,
+		&i.UpdatedBy,
 	)
 	return i, err
 }
 
 const listSurchargeRules = `-- name: ListSurchargeRules :many
-SELECT id, service_id, zone_id, surcharge_type, amount, unit, condition, is_active, created_at, updated_at, deleted_at FROM system_surcharge_rules
+SELECT id, service_id, zone_id, amount, unit, is_active, created_at, updated_at, deleted_at, priority, created_by, updated_by
+FROM system_surcharge_rules
 WHERE deleted_at IS NULL
   AND ($1::uuid IS NULL OR service_id = $1::uuid)
   AND ($2::uuid IS NULL OR zone_id = $2::uuid)
@@ -116,14 +122,15 @@ func (q *Queries) ListSurchargeRules(ctx context.Context, arg ListSurchargeRules
 			&i.ID,
 			&i.ServiceID,
 			&i.ZoneID,
-			&i.SurchargeType,
 			&i.Amount,
 			&i.Unit,
-			&i.Condition,
 			&i.IsActive,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.Priority,
+			&i.CreatedBy,
+			&i.UpdatedBy,
 		); err != nil {
 			return nil, err
 		}
@@ -140,25 +147,25 @@ UPDATE system_surcharge_rules
 SET
   service_id = $2,
   zone_id = $3,
-  surcharge_type = $4,
-  amount = $5,
-  unit = $6,
-  condition = $7,
-  is_active = $8,
+  amount = $4,
+  unit = $5,
+  is_active = $6,
+  priority = $7,
+  updated_by = $8,
   updated_at = CURRENT_TIMESTAMP
 WHERE id = $1 AND deleted_at IS NULL
-RETURNING id, service_id, zone_id, surcharge_type, amount, unit, condition, is_active, created_at, updated_at, deleted_at
+RETURNING id, service_id, zone_id, amount, unit, is_active, created_at, updated_at, deleted_at, priority, created_by, updated_by
 `
 
 type UpdateSurchargeRuleParams struct {
-	ID            uuid.UUID      `json:"id"`
-	ServiceID     uuid.UUID      `json:"service_id"`
-	ZoneID        uuid.UUID      `json:"zone_id"`
-	SurchargeType string         `json:"surcharge_type"`
-	Amount        pgtype.Numeric `json:"amount"`
-	Unit          string         `json:"unit"`
-	Condition     []byte         `json:"condition"`
-	IsActive      bool           `json:"is_active"`
+	ID        uuid.UUID      `json:"id"`
+	ServiceID uuid.UUID      `json:"service_id"`
+	ZoneID    uuid.UUID      `json:"zone_id"`
+	Amount    pgtype.Numeric `json:"amount"`
+	Unit      string         `json:"unit"`
+	IsActive  bool           `json:"is_active"`
+	Priority  int32          `json:"priority"`
+	UpdatedBy uuid.UUID      `json:"updated_by"`
 }
 
 func (q *Queries) UpdateSurchargeRule(ctx context.Context, arg UpdateSurchargeRuleParams) (SystemSurchargeRule, error) {
@@ -166,25 +173,26 @@ func (q *Queries) UpdateSurchargeRule(ctx context.Context, arg UpdateSurchargeRu
 		arg.ID,
 		arg.ServiceID,
 		arg.ZoneID,
-		arg.SurchargeType,
 		arg.Amount,
 		arg.Unit,
-		arg.Condition,
 		arg.IsActive,
+		arg.Priority,
+		arg.UpdatedBy,
 	)
 	var i SystemSurchargeRule
 	err := row.Scan(
 		&i.ID,
 		&i.ServiceID,
 		&i.ZoneID,
-		&i.SurchargeType,
 		&i.Amount,
 		&i.Unit,
-		&i.Condition,
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.Priority,
+		&i.CreatedBy,
+		&i.UpdatedBy,
 	)
 	return i, err
 }

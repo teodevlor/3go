@@ -10,13 +10,13 @@ func ToSurchargeRuleItemDto(r *websystem.SurchargeRule) dto.SurchargeRuleItemDto
 		return dto.SurchargeRuleItemDto{}
 	}
 	return dto.SurchargeRuleItemDto{
-		ID:            r.ID.String(),
-		ServiceID:     r.ServiceID.String(),
-		ZoneID:        r.ZoneID.String(),
-		SurchargeType: r.SurchargeType,
-		Amount:        r.Amount,
-		Unit:          r.Unit,
-		Condition:     r.Condition,
-		IsActive:      r.IsActive,
+		ID:        r.ID.String(),
+		ServiceID: r.ServiceID.String(),
+		ZoneID:    r.ZoneID.String(),
+		Amount:    r.Amount,
+		Unit:      r.Unit,
+		Priority:  int(r.Priority),
+		Condition: nil,
+		IsActive:  r.IsActive,
 	}
 }

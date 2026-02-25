@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"go-structure/internal/common"
+	dto_common "go-structure/internal/dto/common"
 	"go-structure/internal/controller"
 	dto "go-structure/internal/dto/web_system"
 	usecase "go-structure/internal/usecase/web_system"
@@ -82,7 +83,15 @@ func (dpr *distancePricingRuleController) List(c *gin.Context) *common.ResponseD
 	if err != nil {
 		return common.ErrorResponse(common.StatusInternalServerError, []string{err.Error()})
 	}
-	return common.SuccessResponse(common.StatusOK, result)
+	resp := dto.ListDistancePricingRulesResponseDto{
+		Items: result,
+		Pagination: dto_common.PaginationMeta{
+			Page:  1,
+			Limit: len(result),
+			Total: int64(len(result)),
+		},
+	}
+	return common.SuccessResponse(common.StatusOK, resp)
 }
 
 func (dpr *distancePricingRuleController) Update(c *gin.Context) *common.ResponseData {

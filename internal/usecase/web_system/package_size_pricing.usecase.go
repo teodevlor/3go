@@ -61,23 +61,21 @@ func (u *packageSizePricingUsecase) Create(ctx context.Context, req *dto.CreateP
 		IsActive:    req.IsActive,
 	}
 
-	var item *websystem.PackageSizePricing
-	err = u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		if u.serviceRepo != nil {
-			if _, err := u.serviceRepo.GetServiceByID(txCtx, serviceID); err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					return ErrServiceNotFound
+	item, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (*websystem.PackageSizePricing, error) {
+			if u.serviceRepo != nil {
+				if _, err := u.serviceRepo.GetServiceByID(txCtx, serviceID); err != nil {
+					if errors.Is(err, pgx.ErrNoRows) {
+						return nil, ErrServiceNotFound
+					}
+					return nil, err
 				}
-				return err
 			}
-		}
-		created, err := u.repo.Create(txCtx, params)
-		if err != nil {
-			return err
-		}
-		item = created
-		return nil
-	})
+			return u.repo.Create(txCtx, params)
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -131,26 +129,28 @@ func (u *packageSizePricingUsecase) Update(ctx context.Context, id uuid.UUID, re
 		IsActive:    req.IsActive,
 	}
 
-	var item *websystem.PackageSizePricing
-	err = u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		if u.serviceRepo != nil {
-			if _, err := u.serviceRepo.GetServiceByID(txCtx, serviceID); err != nil {
-				if errors.Is(err, pgx.ErrNoRows) {
-					return ErrServiceNotFound
+	item, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (*websystem.PackageSizePricing, error) {
+			if u.serviceRepo != nil {
+				if _, err := u.serviceRepo.GetServiceByID(txCtx, serviceID); err != nil {
+					if errors.Is(err, pgx.ErrNoRows) {
+						return nil, ErrServiceNotFound
+					}
+					return nil, err
 				}
-				return err
 			}
-		}
-		updated, err := u.repo.Update(txCtx, params)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrPackageSizePricingNotFound
+			updated, err := u.repo.Update(txCtx, params)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return nil, ErrPackageSizePricingNotFound
+				}
+				return nil, err
 			}
-			return err
-		}
-		item = updated
-		return nil
-	})
+			return updated, nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -162,7 +162,12 @@ func (u *packageSizePricingUsecase) Delete(ctx context.Context, id uuid.UUID) er
 	if u.repo == nil {
 		return ErrPackageSizePricingNotFound
 	}
-	return u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		return u.repo.Delete(txCtx, id)
-	})
+	_, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (struct{}, error) {
+			return struct{}{}, u.repo.Delete(txCtx, id)
+		},
+	)
+	return err
 }

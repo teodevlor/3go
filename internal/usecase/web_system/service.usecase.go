@@ -84,23 +84,26 @@ func (u *serviceUsecase) CreateService(ctx context.Context, req *dto.CreateServi
 		MinPrice:  common.Float64ToNumeric(req.MinPrice),
 		IsActive:  req.IsActive,
 	}
-	var svc *websystem.Service
-	err = u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		if _, err := u.serviceRepository.GetServiceByCode(txCtx, req.Code); err == nil {
-			return ErrServiceCodeExists
-		} else if !errors.Is(err, pgx.ErrNoRows) {
-			return err
-		}
-		created, err := u.serviceRepository.CreateService(txCtx, params)
-		if err != nil {
-			return err
-		}
-		svc = created
-		if err := u.serviceZoneUsecase.SetZonesForService(txCtx, created.ID, zoneUUIDs); err != nil {
-			return err
-		}
-		return nil
-	})
+
+	svc, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (*websystem.Service, error) {
+			if _, err := u.serviceRepository.GetServiceByCode(txCtx, req.Code); err == nil {
+				return nil, ErrServiceCodeExists
+			} else if !errors.Is(err, pgx.ErrNoRows) {
+				return nil, err
+			}
+			created, err := u.serviceRepository.CreateService(txCtx, params)
+			if err != nil {
+				return nil, err
+			}
+			if err := u.serviceZoneUsecase.SetZonesForService(txCtx, created.ID, zoneUUIDs); err != nil {
+				return nil, err
+			}
+			return created, nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -200,21 +203,24 @@ func (u *serviceUsecase) UpdateService(ctx context.Context, id uuid.UUID, req *d
 		MinPrice:  common.Float64ToNumeric(req.MinPrice),
 		IsActive:  req.IsActive,
 	}
-	var svc *websystem.Service
-	err = u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		updated, err := u.serviceRepository.UpdateService(txCtx, params)
-		if err != nil {
-			if errors.Is(err, pgx.ErrNoRows) {
-				return ErrServiceNotFound
+
+	svc, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (*websystem.Service, error) {
+			updated, err := u.serviceRepository.UpdateService(txCtx, params)
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					return nil, ErrServiceNotFound
+				}
+				return nil, err
 			}
-			return err
-		}
-		svc = updated
-		if err := u.serviceZoneUsecase.SetZonesForService(txCtx, id, zoneUUIDs); err != nil {
-			return err
-		}
-		return nil
-	})
+			if err := u.serviceZoneUsecase.SetZonesForService(txCtx, id, zoneUUIDs); err != nil {
+				return nil, err
+			}
+			return updated, nil
+		},
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -230,7 +236,12 @@ func (u *serviceUsecase) DeleteService(ctx context.Context, id uuid.UUID) error 
 	if u.serviceRepository == nil {
 		return ErrServiceNotFound
 	}
-	return u.transactionManager.WithTransaction(ctx, func(txCtx context.Context) error {
-		return u.serviceRepository.DeleteService(txCtx, id)
-	})
+	_, err := database.WithTransaction(
+		u.transactionManager,
+		ctx,
+		func(txCtx context.Context) (struct{}, error) {
+			return struct{}{}, u.serviceRepository.DeleteService(txCtx, id)
+		},
+	)
+	return err
 }

@@ -19,6 +19,7 @@ type (
 	ISidebarRepository interface {
 		CreateSidebar(ctx context.Context, sidebar *model.Sidebar) (*model.Sidebar, error)
 		GetSidebarByID(ctx context.Context, id uuid.UUID) (*model.Sidebar, error)
+		GetSidebarByContext(ctx context.Context, context string) (*model.Sidebar, error)
 		ListSidebars(ctx context.Context, contextFilter string, limit, offset int32) ([]*model.Sidebar, error)
 		CountSidebars(ctx context.Context, contextFilter string) (int64, error)
 		UpdateSidebar(ctx context.Context, sidebar *model.Sidebar) (*model.Sidebar, error)
@@ -59,6 +60,18 @@ func (r *sidebarRepository) CreateSidebar(ctx context.Context, sidebar *model.Si
 func (r *sidebarRepository) GetSidebarByID(ctx context.Context, id uuid.UUID) (*model.Sidebar, error) {
 	db := r.getDB(ctx)
 	row, err := db.GetSidebarByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, pgx.ErrNoRows
+		}
+		return nil, err
+	}
+	return webmapper.ToSidebar(row), nil
+}
+
+func (r *sidebarRepository) GetSidebarByContext(ctx context.Context, ctxStr string) (*model.Sidebar, error) {
+	db := r.getDB(ctx)
+	row, err := db.GetSidebarByContext(ctx, ctxStr)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, pgx.ErrNoRows

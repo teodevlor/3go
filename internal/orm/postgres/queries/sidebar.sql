@@ -8,6 +8,11 @@ SELECT id, context, version, generated_at, items, created_at, updated_at, delete
 FROM system_sidebars
 WHERE id = $1 AND deleted_at IS NULL;
 
+-- name: GetSidebarByContext :one
+SELECT id, context, version, generated_at, items, created_at, updated_at, deleted_at
+FROM system_sidebars
+WHERE context = $1 AND deleted_at IS NULL;
+
 -- name: ListSidebars :many
 SELECT id, context, version, generated_at, items, created_at, updated_at, deleted_at
 FROM system_sidebars

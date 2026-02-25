@@ -41,7 +41,11 @@ func (s *surchargeRuleController) Create(c *gin.Context) *common.ResponseData {
 		msgs := validator.Translate(err)
 		return common.ErrorResponse(common.StatusUnprocessableEntity, msgs)
 	}
-	result, err := s.uc.Create(c.Request.Context(), &req)
+	adminID, resp := s.GetAdminIDFromContext(c)
+	if resp != nil {
+		return resp
+	}
+	result, err := s.uc.Create(c.Request.Context(), adminID, &req)
 	if err != nil {
 		if errors.Is(err, usecase.ErrServiceNotFound) {
 			return common.ErrorResponse(common.StatusBadRequest, []string{err.Error()})
@@ -102,7 +106,11 @@ func (s *surchargeRuleController) Update(c *gin.Context) *common.ResponseData {
 		msgs := validator.Translate(err)
 		return common.ErrorResponse(common.StatusUnprocessableEntity, msgs)
 	}
-	result, err := s.uc.Update(c.Request.Context(), id, &req)
+	adminID, resp := s.GetAdminIDFromContext(c)
+	if resp != nil {
+		return resp
+	}
+	result, err := s.uc.Update(c.Request.Context(), adminID, id, &req)
 	if err != nil {
 		if errors.Is(err, usecase.ErrSurchargeRuleNotFound) {
 			return common.ErrorResponse(common.StatusNotFound, []string{err.Error()})

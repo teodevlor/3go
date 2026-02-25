@@ -38,6 +38,20 @@ func (b *BaseController) GetAccountIDFromContext(c *gin.Context) (uuid.UUID, *co
 	return accountID, nil
 }
 
+func (b *BaseController) GetAdminIDFromContext(c *gin.Context) (uuid.UUID, *common.ResponseData) {
+	adminIDValue, exists := c.Get(middleware.ContextAdminIDKey)
+	if !exists {
+		return uuid.Nil, common.ErrorResponse(common.StatusUnauthorized, []string{"unauthorized"})
+	}
+
+	adminID, ok := adminIDValue.(uuid.UUID)
+	if !ok {
+		return uuid.Nil, common.ErrorResponse(common.StatusUnauthorized, []string{"invalid admin id in context"})
+	}
+
+	return adminID, nil
+}
+
 func (b *BaseController) GetClientIP(c *gin.Context) string {
 	if ip := c.GetHeader("X-Real-IP"); ip != "" {
 		return ip

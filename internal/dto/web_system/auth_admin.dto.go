@@ -11,6 +11,8 @@ type (
 	AdminLoginResponseDto struct {
 		AccessToken  string                  `json:"access_token" example:"access_token"`
 		RefreshToken string                  `json:"refresh_token" example:"refresh_token"`
+		ExpiresIn    int64                   `json:"expires_in" example:"900"`     // Số giây access token còn hiệu lực
+		ExpiredAt    string                  `json:"expired_at" example:"2025-02-24T12:30:00Z"` // Thời điểm access token hết hạn (RFC3339)
 		Admin        AdminProfileResponseDto `json:"admin"`
 	}
 
