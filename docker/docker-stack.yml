@@ -31,6 +31,7 @@ services:
         reservations:
           cpus: "0.5"
           memory: 256M
+
   postgres:
     image: postgis/postgis:15-3.4
     networks:
@@ -47,13 +48,28 @@ services:
           - node.role == manager
       restart_policy:
         condition: any
+
+  redis:
+    image: redis:7-alpine
+    networks:
+      - gogogo_net
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    deploy:
+      restart_policy:
+        condition: any
+
 volumes:
   storage_data:
   postgres_data:
+  redis_data:
+
 networks:
   gogogo_net:
     driver: overlay
     attachable: true
+
 configs:
   gogogo_config:
     external: true
