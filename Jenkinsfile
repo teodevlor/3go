@@ -17,6 +17,7 @@ pipeline {
             }
             steps {
                 echo "Deploying DEV..."
+                echo "Hẹ hẹ..."
             }
         }
 
