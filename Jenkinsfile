@@ -1,5 +1,6 @@
 pipeline {
     agent none
+
     environment {
         IMAGE_NAME = "octotechvn/gogogo-api"
         STACK_NAME = "gogogo"
@@ -12,53 +13,13 @@ pipeline {
         // DEV PIPELINE
         // =========================
         stage('DEV Pipeline') {
-            when {
-                branch 'dev'
-            }
-            agent {
-                label 'node-server-vanchuyenxanh'
-            }
+            when { branch 'dev' }
+
+            agent { label 'node-server-vanchuyenxanh' }
+
             stages {
 
-                stage('Debug DEV') {
-                    steps {
-                        echo "Running on DEV node..."
-                        echo "Branch: ${env.BRANCH_NAME}"
-                        sh "whoami"
-                        sh "hostname"
-                    }
-                }
-
-                stage('Deploy DEV (temporary)') {
-                    steps {
-                        echo "Hiện tại DEV chưa build production image."
-                    }
-                }
-            }
-        }
-
-        // =========================
-        // PRODUCTION PIPELINE
-        // =========================
-        stage('PROD Pipeline') {
-            when {
-                branch 'master'
-            }
-            agent {
-                label 'node-manager-docker-swam'
-            }
-            stages {
-
-                stage('Debug PROD') {
-                    steps {
-                        echo "Running on PROD Swarm Manager..."
-                        sh "whoami"
-                        sh "hostname"
-                        sh "git rev-parse --short HEAD"
-                    }
-                }
-
-                stage('Build & Push Docker Image') {
+                stage('Build & Push DEV Image') {
                     steps {
                         script {
 
@@ -67,12 +28,10 @@ pipeline {
                                 returnStdout: true
                             ).trim()
 
-                            def now = new Date().format(
-                                "yyyyMMdd-HHmmss",
-                                TimeZone.getTimeZone('Asia/Ho_Chi_Minh')
-                            )
+                            def buildNumber = env.BUILD_NUMBER
+                            env.TAG = "dev-${buildNumber}-${commit}"
 
-                            env.TAG = "${now}-${commit}"
+                            echo "Generated DEV TAG: ${env.TAG}"
 
                             withCredentials([usernamePassword(
                                 credentialsId: env.DOCKER_CREDENTIALS,
@@ -87,20 +46,80 @@ pipeline {
                                         -f docker/Dockerfile \
                                         -t ${IMAGE_NAME}:${TAG} .
 
+                                    docker tag ${IMAGE_NAME}:${TAG} ${IMAGE_NAME}:dev-latest
+
                                     docker push ${IMAGE_NAME}:${TAG}
+                                    docker push ${IMAGE_NAME}:dev-latest
 
                                     docker logout
                                 """
                             }
 
-                            currentBuild.description = "Prod Image: ${TAG}"
+                            currentBuild.description = "DEV Image: ${TAG}"
+                        }
+                    }
+                }
+            }
+        }
+
+        // =========================
+        // PROD PIPELINE
+        // =========================
+        stage('PROD Pipeline') {
+            when { branch 'master' }
+
+            agent { label 'node-manager-docker-swam' }
+
+            stages {
+
+                stage('Build & Push PROD Image') {
+                    steps {
+                        script {
+
+                            def commit = sh(
+                                script: "git rev-parse --short HEAD",
+                                returnStdout: true
+                            ).trim()
+
+                            def buildNumber = env.BUILD_NUMBER
+                            env.TAG = "prod-${buildNumber}-${commit}"
+
+                            echo "Generated PROD TAG: ${env.TAG}"
+
+                            withCredentials([usernamePassword(
+                                credentialsId: env.DOCKER_CREDENTIALS,
+                                usernameVariable: 'DOCKER_USER',
+                                passwordVariable: 'DOCKER_PASS'
+                            )]) {
+
+                                sh """
+                                    echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin
+
+                                    docker build \
+                                        -f docker/Dockerfile \
+                                        -t ${IMAGE_NAME}:${TAG} .
+
+                                    docker tag ${IMAGE_NAME}:${TAG} ${IMAGE_NAME}:prod-latest
+
+                                    docker push ${IMAGE_NAME}:${TAG}
+                                    docker push ${IMAGE_NAME}:prod-latest
+
+                                    docker logout
+                                """
+                            }
+
+                            currentBuild.description = "PROD Image: ${TAG}"
                         }
                     }
                 }
 
                 stage('Run migrations and seeds') {
                     steps {
-                        withCredentials([string(credentialsId: 'prod-postgres-dsn', variable: 'POSTGRES_DSN')]) {
+                        withCredentials([string(
+                            credentialsId: 'prod-postgres-dsn',
+                            variable: 'POSTGRES_DSN'
+                        )]) {
+
                             sh """
                                 set -e
 
@@ -108,7 +127,7 @@ pipeline {
 
                                 docker run --rm \
                                 --network gogogo_gogogo_net \
-                                -e POSTGRES_DSN="$POSTGRES_DSN" \
+                                -e POSTGRES_DSN="\$POSTGRES_DSN" \
                                 ${IMAGE_NAME}:${TAG} \
                                 ./migrate
 
@@ -116,7 +135,7 @@ pipeline {
 
                                 docker run --rm \
                                 --network gogogo_gogogo_net \
-                                -e POSTGRES_DSN="$POSTGRES_DSN" \
+                                -e POSTGRES_DSN="\$POSTGRES_DSN" \
                                 ${IMAGE_NAME}:${TAG} \
                                 ./migrate seed
                             """
