@@ -1,38 +1,32 @@
-def IMAGE_NAME = "octotechvn/gogogo-api"
-def GITHUB_URL = "https://github.com/teodevlor/3go.git"
+pipeline {
+    agent any
 
-def BRANCH = env.BRANCH_NAME
+    stages {
 
-def NODE_LABEL
-def STACK_NAME
-def ENVIRONMENT
+        stage('Debug') {
+            steps {
+                echo "Branch: ${env.BRANCH_NAME}"
+                sh "whoami"
+                sh "hostname"
+            }
+        }
 
-if (BRANCH == "dev") {
-    ENVIRONMENT = "dev"
-    STACK_NAME = "gogogo-dev"
-    NODE_LABEL = "dev-server"
-} 
-else if (BRANCH == "master") {
-    ENVIRONMENT = "prod"
-    STACK_NAME = "gogogo-prod"
-    NODE_LABEL = "prod-server"
-} 
-else {
-    error("Branch ${BRANCH} is not deployable!")
-}
+        stage('Deploy Dev') {
+            when {
+                branch 'dev'
+            }
+            steps {
+                echo "Deploying DEV..."
+            }
+        }
 
-node(NODE_LABEL) {
-
-    stage("Check Environment") {
-        sh """
-            echo "Branch: ${BRANCH}"
-            echo "Environment: ${ENVIRONMENT}"
-            echo "Stack: ${STACK_NAME}"
-            echo "Running on node:"
-            hostname
-            whoami
-            pwd
-        """
+        stage('Deploy Prod') {
+            when {
+                branch 'master'
+            }
+            steps {
+                echo "Deploying PROD..."
+            }
+        }
     }
-
 }
