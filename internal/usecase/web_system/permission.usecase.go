@@ -5,10 +5,12 @@ import (
 	"errors"
 	"strings"
 
+	"go-structure/global"
 	"go-structure/internal/constants"
 	dto_common "go-structure/internal/dto/common"
 	dto "go-structure/internal/dto/web_system"
 	"go-structure/internal/helper/database"
+	"go-structure/internal/middleware"
 	pgdb "go-structure/orm/db/postgres"
 	websystem_model "go-structure/internal/repository/model/web_system"
 	websystem_repo "go-structure/internal/repository/web_system"
@@ -17,6 +19,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"go.uber.org/zap"
 )
 
 var (
@@ -51,6 +54,9 @@ func NewPermissionUsecase(repo websystem_repo.IPermissionRepository, transaction
 }
 
 func (u *permissionUsecase) Create(ctx context.Context, req *dto.CreatePermissionRequestDto) (*dto.PermissionItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Create: start", zap.String(global.KeyCorrelationID, cid), zap.String("resource", req.Resource), zap.String("action", req.Action))
+
 	if u.repo == nil {
 		return nil, nil
 	}
@@ -78,28 +84,40 @@ func (u *permissionUsecase) Create(ctx context.Context, req *dto.CreatePermissio
 		},
 	)
 	if err != nil {
+		global.Logger.Error("Create: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("Create: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", perm.ID.String()))
 	item := permissionTransformer.ToPermissionItemDto(perm)
 	return &item, nil
 }
 
 func (u *permissionUsecase) GetByID(ctx context.Context, id uuid.UUID) (*dto.PermissionItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("GetByID: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.repo == nil {
+		global.Logger.Error("GetByID: repository nil", zap.String(global.KeyCorrelationID, cid))
 		return nil, ErrPermissionNotFound
 	}
 	perm, err := u.repo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			global.Logger.Error("GetByID: permission not found", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 			return nil, ErrPermissionNotFound
 		}
+		global.Logger.Error("GetByID: failed to get permission", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("GetByID: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	item := permissionTransformer.ToPermissionItemDto(perm)
 	return &item, nil
 }
 
 func (u *permissionUsecase) List(ctx context.Context, page, limit int, search string) (*dto.ListPermissionsResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("List: start", zap.String(global.KeyCorrelationID, cid), zap.Int("page", page), zap.Int("limit", limit))
+
 	if u.repo == nil {
 		return &dto.ListPermissionsResponseDto{
 			Items: nil,
@@ -128,16 +146,19 @@ func (u *permissionUsecase) List(ctx context.Context, page, limit int, search st
 
 	total, err := u.repo.Count(ctx, search)
 	if err != nil {
+		global.Logger.Error("List: failed to count", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	perms, err := u.repo.List(ctx, search, limit32, offset)
 	if err != nil {
+		global.Logger.Error("List: failed to list", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	items := make([]dto.PermissionItemDto, 0, len(perms))
 	for _, p := range perms {
 		items = append(items, permissionTransformer.ToPermissionItemDto(p))
 	}
+	global.Logger.Info("List: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.Int64("total", total))
 	return &dto.ListPermissionsResponseDto{
 		Items: items,
 		Pagination: dto_common.PaginationMeta{
@@ -149,7 +170,11 @@ func (u *permissionUsecase) List(ctx context.Context, page, limit int, search st
 }
 
 func (u *permissionUsecase) Update(ctx context.Context, id uuid.UUID, req *dto.UpdatePermissionRequestDto) (*dto.PermissionItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Update: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.repo == nil {
+		global.Logger.Error("Update: repository nil", zap.String(global.KeyCorrelationID, cid))
 		return nil, ErrPermissionNotFound
 	}
 	desc := ""
@@ -190,14 +215,20 @@ func (u *permissionUsecase) Update(ctx context.Context, id uuid.UUID, req *dto.U
 		},
 	)
 	if err != nil {
+		global.Logger.Error("Update: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("Update: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	item := permissionTransformer.ToPermissionItemDto(perm)
 	return &item, nil
 }
 
 func (u *permissionUsecase) Delete(ctx context.Context, id uuid.UUID) error {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Delete: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.repo == nil {
+		global.Logger.Error("Delete: repository nil", zap.String(global.KeyCorrelationID, cid))
 		return ErrPermissionNotFound
 	}
 	_, err := database.WithTransaction(
@@ -207,5 +238,10 @@ func (u *permissionUsecase) Delete(ctx context.Context, id uuid.UUID) error {
 			return struct{}{}, u.repo.Delete(txCtx, id)
 		},
 	)
-	return err
+	if err != nil {
+		global.Logger.Error("Delete: failed to delete permission", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+		return err
+	}
+	global.Logger.Info("Delete: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+	return nil
 }

@@ -6,15 +6,18 @@ import (
 	"errors"
 	"time"
 
+	"go-structure/global"
 	"go-structure/internal/constants"
 	dto_common "go-structure/internal/dto/common"
 	dto "go-structure/internal/dto/web_system"
 	"go-structure/internal/helper/database"
+	"go-structure/internal/middleware"
 	"go-structure/internal/repository/model"
 	sidebar_repo "go-structure/internal/repository/web_system"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"go.uber.org/zap"
 )
 
 var (
@@ -45,8 +48,12 @@ func NewSidebarUsecase(sidebarRepo sidebar_repo.ISidebarRepository, transactionM
 }
 
 func (u *sidebarUsecase) CreateSidebar(ctx context.Context, req *dto.CreateSidebarRequestDto) (*dto.SidebarResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("CreateSidebar: start", zap.String(global.KeyCorrelationID, cid), zap.String("context", req.Context))
+
 	itemsJSON, err := json.Marshal(req.Items)
 	if err != nil {
+		global.Logger.Error("CreateSidebar: failed to marshal items", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	version := req.Version
@@ -72,34 +79,48 @@ func (u *sidebarUsecase) CreateSidebar(ctx context.Context, req *dto.CreateSideb
 		},
 	)
 	if err != nil {
+		global.Logger.Error("CreateSidebar: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("CreateSidebar: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("sidebar_id", sidebar.ID.String()))
 	return u.sidebarToResponse(sidebar), nil
 }
 
 func (u *sidebarUsecase) GetSidebar(ctx context.Context, id uuid.UUID) (*dto.SidebarResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("GetSidebar: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	sidebar, err := u.sidebarRepo.GetSidebarByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			global.Logger.Error("GetSidebar: sidebar not found", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 			return nil, ErrSidebarNotFound
 		}
+		global.Logger.Error("GetSidebar: failed to get sidebar", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("GetSidebar: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	return u.sidebarToResponse(sidebar), nil
 }
 
 func (u *sidebarUsecase) GetSidebarByContext(ctx context.Context, sidebarContext string) (*dto.SidebarResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("GetSidebarByContext: start", zap.String(global.KeyCorrelationID, cid), zap.String("context", sidebarContext))
 	sidebar, err := u.sidebarRepo.GetSidebarByContext(ctx, sidebarContext)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			global.Logger.Error("GetSidebarByContext: sidebar not found", zap.String(global.KeyCorrelationID, cid), zap.String("context", sidebarContext))
 			return nil, ErrSidebarNotFound
 		}
+		global.Logger.Error("GetSidebarByContext: failed to get sidebar", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("GetSidebarByContext: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("context", sidebarContext))
 	return u.sidebarToResponse(sidebar), nil
 }
 
 func (u *sidebarUsecase) ListSidebars(ctx context.Context, contextFilter string, page, limit int) (*dto.ListSidebarsResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("ListSidebars: start", zap.String(global.KeyCorrelationID, cid), zap.Int("page", page), zap.Int("limit", limit))
 	if page < 1 {
 		page = constants.DefaultPage
 	}
@@ -111,16 +132,19 @@ func (u *sidebarUsecase) ListSidebars(ctx context.Context, contextFilter string,
 
 	total, err := u.sidebarRepo.CountSidebars(ctx, contextFilter)
 	if err != nil {
+		global.Logger.Error("ListSidebars: failed to count sidebars", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	sidebars, err := u.sidebarRepo.ListSidebars(ctx, contextFilter, limit32, offset)
 	if err != nil {
+		global.Logger.Error("ListSidebars: failed to list sidebars", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	items := make([]dto.SidebarResponseDto, 0, len(sidebars))
 	for _, s := range sidebars {
 		items = append(items, *u.sidebarToResponse(s))
 	}
+	global.Logger.Info("ListSidebars: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.Int64("total", total))
 	return &dto.ListSidebarsResponseDto{
 		Items: items,
 		Pagination: dto_common.PaginationMeta{
@@ -132,8 +156,11 @@ func (u *sidebarUsecase) ListSidebars(ctx context.Context, contextFilter string,
 }
 
 func (u *sidebarUsecase) UpdateSidebar(ctx context.Context, id uuid.UUID, req *dto.UpdateSidebarRequestDto) (*dto.SidebarResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("UpdateSidebar: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	itemsJSON, err := json.Marshal(req.Items)
 	if err != nil {
+		global.Logger.Error("UpdateSidebar: failed to marshal items", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	version := req.Version
@@ -167,12 +194,16 @@ func (u *sidebarUsecase) UpdateSidebar(ctx context.Context, id uuid.UUID, req *d
 		},
 	)
 	if err != nil {
+		global.Logger.Error("UpdateSidebar: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("UpdateSidebar: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	return u.sidebarToResponse(sidebar), nil
 }
 
 func (u *sidebarUsecase) DeleteSidebar(ctx context.Context, id uuid.UUID) error {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("DeleteSidebar: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	_, err := database.WithTransaction(
 		u.transactionManager,
 		ctx,
@@ -180,7 +211,12 @@ func (u *sidebarUsecase) DeleteSidebar(ctx context.Context, id uuid.UUID) error 
 			return struct{}{}, u.sidebarRepo.DeleteSidebar(txCtx, id)
 		},
 	)
-	return err
+	if err != nil {
+		global.Logger.Error("DeleteSidebar: failed to delete sidebar", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+		return err
+	}
+	global.Logger.Info("DeleteSidebar: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+	return nil
 }
 
 func (u *sidebarUsecase) sidebarToResponse(s *model.Sidebar) *dto.SidebarResponseDto {

@@ -1,0 +1,10 @@
+{
+    "correlation_id": "...",
+    "method": "POST",
+    "path": "/login",
+    "query": "",
+    "status": 401,
+    "latency": "120ms",
+    "request_body": {},
+    "response_body": {}
+  }

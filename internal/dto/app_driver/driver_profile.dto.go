@@ -3,28 +3,35 @@ package app_driver
 import (
 	"time"
 
+	"go-structure/internal/common"
 	dto_common "go-structure/internal/dto/common"
 
 	"github.com/google/uuid"
 )
 
+const (
+	GenderMale   = common.GenderMale
+	GenderFemale = common.GenderFemale
+	GenderOther  = common.GenderOther
+)
+
 type (
 	DriverRegisterRequestDto struct {
-			Phone      string      `json:"phone" binding:"required"`
-			FullName   string      `json:"full_name" binding:"required"`
-			Password   string      `json:"password" binding:"required"`
-			ServiceIDs []uuid.UUID `json:"service_ids" binding:"omitempty,dive,required"`
-		}
+		Phone      string      `json:"phone" binding:"required"`
+		FullName   string      `json:"full_name" binding:"required"`
+		Password   string      `json:"password" binding:"required"`
+		ServiceIDs []uuid.UUID `json:"service_ids" binding:"omitempty,dive,required"`
+	}
 
-		AdminCreateDriverProfileRequestDto struct {
-			Phone      string      `json:"phone" binding:"required"`
-			Password   string      `json:"password" binding:"required"`
-			FullName   string      `json:"full_name" binding:"required"`
-			DateOfBirth *string    `json:"date_of_birth"`
-			Gender     string      `json:"gender"`
-			Address    string      `json:"address"`
-			ServiceIDs []uuid.UUID `json:"service_ids" binding:"omitempty,dive,required"`
-		}
+	AdminCreateDriverProfileRequestDto struct {
+		Phone       string      `json:"phone" binding:"required"`
+		Password    string      `json:"password" binding:"required"`
+		FullName    string      `json:"full_name" binding:"required"`
+		DateOfBirth *string     `json:"date_of_birth"`
+		Gender      string      `json:"gender"`
+		Address     string      `json:"address"`
+		ServiceIDs  []uuid.UUID `json:"service_ids" binding:"omitempty,dive,required"`
+	}
 
 	DriverRegisterResponseDto struct {
 		UserMessage string `json:"user_message" example:"Đăng ký tài khoản tài xế thành công, vui lòng kiểm tra điện thoại để nhận mã OTP"`
@@ -56,19 +63,20 @@ type (
 	}
 
 	DriverProfileItemDto struct {
-		ID               uuid.UUID  `json:"id"`
-		AccountID        uuid.UUID  `json:"account_id"`
-		Phone            string     `json:"phone"`
-		FullName         string     `json:"full_name"`
-		DateOfBirth      *time.Time `json:"date_of_birth,omitempty"`
-		Gender           string     `json:"gender,omitempty"`
-		Address          string     `json:"address,omitempty"`
-		GlobalStatus     string     `json:"global_status"`
-		GlobalStatusText string     `json:"global_status_text"`
-		Rating           float64    `json:"rating"`
-		TotalCompletedOrders int32  `json:"total_completed_orders"`
-		CreatedAt        time.Time  `json:"created_at"`
-		UpdatedAt        time.Time  `json:"updated_at"`
+		ID                   uuid.UUID   `json:"id"`
+		AccountID            uuid.UUID   `json:"account_id"`
+		Phone                string      `json:"phone"`
+		FullName             string      `json:"full_name"`
+		DateOfBirth          *time.Time  `json:"date_of_birth,omitempty"`
+		Gender               string      `json:"gender,omitempty"`
+		Address              string      `json:"address,omitempty"`
+		GlobalStatus         string      `json:"global_status"`
+		GlobalStatusText     string      `json:"global_status_text"`
+		Rating               float64     `json:"rating"`
+		TotalCompletedOrders int32       `json:"total_completed_orders"`
+		ServiceIDs           []uuid.UUID `json:"service_ids,omitempty"`
+		CreatedAt            time.Time   `json:"created_at"`
+		UpdatedAt            time.Time   `json:"updated_at"`
 	}
 
 	DriverLoginResponseDto struct {

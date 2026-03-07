@@ -16,10 +16,16 @@ const countDriverProfiles = `-- name: CountDriverProfiles :one
 SELECT COUNT(*) FROM driver_profiles
 WHERE deleted_at IS NULL
   AND ($1 = '' OR full_name ILIKE '%' || $1 || '%')
+  AND ($2 = '' OR global_status = $2::driver_profile_status)
 `
 
-func (q *Queries) CountDriverProfiles(ctx context.Context, dollar_1 interface{}) (int64, error) {
-	row := q.db.QueryRow(ctx, countDriverProfiles, dollar_1)
+type CountDriverProfilesParams struct {
+	Column1 interface{} `json:"column_1"`
+	Column2 interface{} `json:"column_2"`
+}
+
+func (q *Queries) CountDriverProfiles(ctx context.Context, arg CountDriverProfilesParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countDriverProfiles, arg.Column1, arg.Column2)
 	var count int64
 	err := row.Scan(&count)
 	return count, err
@@ -141,18 +147,25 @@ const listDriverProfiles = `-- name: ListDriverProfiles :many
 SELECT id, account_id, full_name, date_of_birth, gender, address, global_status, rating, total_completed_orders, created_at, updated_at, deleted_at FROM driver_profiles
 WHERE deleted_at IS NULL
   AND ($1 = '' OR full_name ILIKE '%' || $1 || '%')
+  AND ($2 = '' OR global_status = $2::driver_profile_status)
 ORDER BY created_at DESC
-LIMIT $2 OFFSET $3
+LIMIT $3 OFFSET $4
 `
 
 type ListDriverProfilesParams struct {
 	Column1 interface{} `json:"column_1"`
+	Column2 interface{} `json:"column_2"`
 	Limit   int32       `json:"limit"`
 	Offset  int32       `json:"offset"`
 }
 
 func (q *Queries) ListDriverProfiles(ctx context.Context, arg ListDriverProfilesParams) ([]DriverProfile, error) {
-	rows, err := q.db.Query(ctx, listDriverProfiles, arg.Column1, arg.Limit, arg.Offset)
+	rows, err := q.db.Query(ctx, listDriverProfiles,
+		arg.Column1,
+		arg.Column2,
+		arg.Limit,
+		arg.Offset,
+	)
 	if err != nil {
 		return nil, err
 	}

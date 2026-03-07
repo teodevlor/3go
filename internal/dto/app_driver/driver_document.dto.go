@@ -2,12 +2,14 @@ package app_driver
 
 import (
 	"time"
+
+	"go-structure/internal/common"
 )
 
 const (
-	DriverDocumentStatusPENDING  = "PENDING"
-	DriverDocumentStatusAPPROVED = "APPROVED"
-	DriverDocumentStatusREJECTED = "REJECTED"
+	DriverDocumentStatusPENDING  = common.DriverDocumentStatusPending
+	DriverDocumentStatusAPPROVED = common.DriverDocumentStatusApproved
+	DriverDocumentStatusREJECTED = common.DriverDocumentStatusRejected
 )
 
 type (
@@ -48,17 +50,18 @@ type (
 	}
 
 	DriverDocumentItemDto struct {
-		ID             string     `json:"id"`
-		DriverID       string     `json:"driver_id"`
-		DocumentTypeID string     `json:"document_type_id"`
-		FileUrl        string     `json:"file_url"`
-		ExpireAt       *string    `json:"expire_at,omitempty"`
-		Status         string     `json:"status"`
-		RejectReason   *string    `json:"reject_reason,omitempty"`
-		VerifiedAt     *time.Time `json:"verified_at,omitempty"`
-		VerifiedBy     *string    `json:"verified_by,omitempty"`
-		CreatedAt      time.Time  `json:"created_at"`
-		UpdatedAt      time.Time  `json:"updated_at"`
+		ID             string                    `json:"id"`
+		DriverID       string                    `json:"driver_id"`
+		DocumentTypeID string                    `json:"document_type_id"`
+		DocumentType   *DriverDocumentTypeItemDto `json:"document_type,omitempty"`
+		FileUrl        string                    `json:"file_url"`
+		ExpireAt       *string                   `json:"expire_at,omitempty"`
+		Status         string                    `json:"status"`
+		RejectReason   *string                   `json:"reject_reason,omitempty"`
+		VerifiedAt     *time.Time                `json:"verified_at,omitempty"`
+		VerifiedBy     *string                   `json:"verified_by,omitempty"`
+		CreatedAt      time.Time                 `json:"created_at"`
+		UpdatedAt      time.Time                 `json:"updated_at"`
 	}
 
 	UpdateDriverDocumentRequestDto struct {
@@ -66,6 +69,10 @@ type (
 		ExpireAt     *string `json:"expire_at"`
 		Status       string  `json:"status" binding:"required,oneof=PENDING APPROVED REJECTED"`
 		RejectReason *string `json:"reject_reason"`
+	}
+
+	UpdateDriverDocumentStatusRequestDto struct {
+		Status string `json:"status" binding:"required,oneof=PENDING APPROVED REJECTED"`
 	}
 
 	BulkUpdateDriverDocumentsRequestDto struct {

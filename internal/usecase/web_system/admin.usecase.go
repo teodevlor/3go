@@ -5,10 +5,12 @@ import (
 	"errors"
 	"strings"
 
+	"go-structure/global"
 	"go-structure/internal/constants"
 	dto_common "go-structure/internal/dto/common"
 	dto "go-structure/internal/dto/web_system"
 	"go-structure/internal/helper/database"
+	"go-structure/internal/middleware"
 	pgdb "go-structure/orm/db/postgres"
 	"go-structure/internal/repository/model"
 	websystem_repo "go-structure/internal/repository/web_system"
@@ -18,6 +20,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"go.uber.org/zap"
 )
 
 var ErrAdminEmailUsed = errors.New("email admin đã được sử dụng")
@@ -91,15 +94,20 @@ func (u *adminUsecase) validateRoleIDs(ctx context.Context, roleIDs []string) ([
 }
 
 func (u *adminUsecase) Create(ctx context.Context, req *dto.CreateAdminRequestDto) (*dto.AdminItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Create: start", zap.String(global.KeyCorrelationID, cid), zap.String("email", req.Email))
+
 	if u.adminRepo == nil {
 		return nil, nil
 	}
 	roleUUIDs, err := u.validateRoleIDs(ctx, req.RoleIDs)
 	if err != nil {
+		global.Logger.Error("Create: failed to validate role IDs", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	hashedPassword, err := validator.HashPassword(req.Password)
 	if err != nil {
+		global.Logger.Error("Create: failed to hash password", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	fullName := pgtype.Text{String: req.FullName, Valid: true}
@@ -134,8 +142,10 @@ func (u *adminUsecase) Create(ctx context.Context, req *dto.CreateAdminRequestDt
 		},
 	)
 	if err != nil {
+		global.Logger.Error("Create: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("Create: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("admin_id", admin.ID.String()))
 	roleIDs, _ := u.adminRoleRepo.GetRoleIDsByAdminID(ctx, admin.ID)
 	roles := u.getRoleItemDtos(ctx, roleIDs)
 	item := adminTransformer.ToAdminItemDto(admin, roles)
@@ -143,16 +153,23 @@ func (u *adminUsecase) Create(ctx context.Context, req *dto.CreateAdminRequestDt
 }
 
 func (u *adminUsecase) GetByID(ctx context.Context, id uuid.UUID) (*dto.AdminItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("GetByID: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.adminRepo == nil {
+		global.Logger.Error("GetByID: repository nil", zap.String(global.KeyCorrelationID, cid))
 		return nil, ErrAdminNotFound
 	}
 	admin, err := u.adminRepo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			global.Logger.Error("GetByID: admin not found", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 			return nil, ErrAdminNotFound
 		}
+		global.Logger.Error("GetByID: failed to get admin", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("GetByID: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	roleIDs, _ := u.adminRoleRepo.GetRoleIDsByAdminID(ctx, id)
 	roles := u.getRoleItemDtos(ctx, roleIDs)
 	item := adminTransformer.ToAdminItemDto(admin, roles)
@@ -160,6 +177,9 @@ func (u *adminUsecase) GetByID(ctx context.Context, id uuid.UUID) (*dto.AdminIte
 }
 
 func (u *adminUsecase) List(ctx context.Context, page, limit int, search string) (*dto.ListAdminsResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("List: start", zap.String(global.KeyCorrelationID, cid), zap.Int("page", page), zap.Int("limit", limit))
+
 	if u.adminRepo == nil {
 		return &dto.ListAdminsResponseDto{Items: nil, Pagination: dto_common.PaginationMeta{Page: page, Limit: limit, Total: 0}}, nil
 	}
@@ -178,12 +198,15 @@ func (u *adminUsecase) List(ctx context.Context, page, limit int, search string)
 
 	total, err := u.adminRepo.Count(ctx, search)
 	if err != nil {
+		global.Logger.Error("List: failed to count admins", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	admins, err := u.adminRepo.List(ctx, search, limit32, offset)
 	if err != nil {
+		global.Logger.Error("List: failed to list admins", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("List: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.Int64("total", total))
 	items := make([]dto.AdminItemDto, 0, len(admins))
 	for _, a := range admins {
 		roleIDs, _ := u.adminRoleRepo.GetRoleIDsByAdminID(ctx, a.ID)
@@ -201,12 +224,17 @@ func (u *adminUsecase) List(ctx context.Context, page, limit int, search string)
 }
 
 func (u *adminUsecase) Update(ctx context.Context, id uuid.UUID, req *dto.UpdateAdminRequestDto) (*dto.AdminItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Update: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.adminRepo == nil {
+		global.Logger.Error("Update: repository nil", zap.String(global.KeyCorrelationID, cid))
 		return nil, ErrAdminNotFound
 	}
 	roleIDStrs := *req.RoleIDs
 	roleUUIDs, err := u.validateRoleIDs(ctx, roleIDStrs)
 	if err != nil {
+		global.Logger.Error("Update: failed to validate role IDs", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	fullName := pgtype.Text{String: *req.FullName, Valid: true}
@@ -244,8 +272,10 @@ func (u *adminUsecase) Update(ctx context.Context, id uuid.UUID, req *dto.Update
 		},
 	)
 	if err != nil {
+		global.Logger.Error("Update: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("Update: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	adminRoleIDs, _ := u.adminRoleRepo.GetRoleIDsByAdminID(ctx, admin.ID)
 	roles := u.getRoleItemDtos(ctx, adminRoleIDs)
 	item := adminTransformer.ToAdminItemDto(admin, roles)
@@ -253,7 +283,11 @@ func (u *adminUsecase) Update(ctx context.Context, id uuid.UUID, req *dto.Update
 }
 
 func (u *adminUsecase) Delete(ctx context.Context, id uuid.UUID) error {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Delete: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.adminRepo == nil {
+		global.Logger.Error("Delete: repository nil", zap.String(global.KeyCorrelationID, cid))
 		return ErrAdminNotFound
 	}
 	_, err := database.WithTransaction(
@@ -263,5 +297,10 @@ func (u *adminUsecase) Delete(ctx context.Context, id uuid.UUID) error {
 			return struct{}{}, u.adminRepo.Delete(txCtx, id)
 		},
 	)
-	return err
+	if err != nil {
+		global.Logger.Error("Delete: failed to delete admin", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+		return err
+	}
+	global.Logger.Info("Delete: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+	return nil
 }

@@ -8,6 +8,7 @@ import (
 
 	"go-structure/global"
 	"go-structure/internal/constants"
+	"go-structure/internal/middleware"
 	dto_common "go-structure/internal/dto/common"
 	dto "go-structure/internal/dto/web_system"
 	"go-structure/internal/helper/database"
@@ -48,11 +49,15 @@ func NewZoneUsecase(zoneRepository repository.IZoneRepository, transactionManage
 }
 
 func (u *zoneUsecase) CreateZone(ctx context.Context, req *dto.CreateZoneRequestDto) (*dto.CreateZoneResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("CreateZone: start", zap.String(global.KeyCorrelationID, cid), zap.String("code", req.Code))
+
 	if u.zoneRepository == nil {
 		return nil, nil
 	}
 	polygonBytes, err := json.Marshal(req.Polygon)
 	if err != nil {
+		global.Logger.Error("CreateZone: failed to marshal polygon", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	zoneInput := &model.Zone{
@@ -76,9 +81,10 @@ func (u *zoneUsecase) CreateZone(ctx context.Context, req *dto.CreateZoneRequest
 		},
 	)
 	if err != nil {
+		global.Logger.Error("CreateZone: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
-	global.GetChannelLogger("zone").Info("create zone", zap.Any("zone", zone))
+	global.Logger.Info("CreateZone: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("zone_id", zone.ID.String()))
 	return &dto.CreateZoneResponseDto{
 		ID:              zone.ID.String(),
 		Code:            zone.Code,
@@ -90,21 +96,31 @@ func (u *zoneUsecase) CreateZone(ctx context.Context, req *dto.CreateZoneRequest
 }
 
 func (u *zoneUsecase) GetZone(ctx context.Context, id uuid.UUID) (*dto.ZoneItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("GetZone: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.zoneRepository == nil {
+		global.Logger.Error("GetZone: zone repository nil", zap.String(global.KeyCorrelationID, cid))
 		return nil, ErrZoneNotFound
 	}
 	zone, err := u.zoneRepository.GetZoneByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			global.Logger.Error("GetZone: zone not found", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 			return nil, ErrZoneNotFound
 		}
+		global.Logger.Error("GetZone: failed to get zone", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("GetZone: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	item := zoneTransformer.ToZoneItemDto(zone)
 	return &item, nil
 }
 
 func (u *zoneUsecase) ListZones(ctx context.Context, page int, limit int, search string) (*dto.ListZonesResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("ListZones: start", zap.String(global.KeyCorrelationID, cid), zap.Int("page", page), zap.Int("limit", limit))
+
 	if u.zoneRepository == nil {
 		return &dto.ListZonesResponseDto{Items: nil, Pagination: dto_common.PaginationMeta{Page: page, Limit: limit, Total: 0}}, nil
 	}
@@ -123,16 +139,19 @@ func (u *zoneUsecase) ListZones(ctx context.Context, page int, limit int, search
 
 	total, err := u.zoneRepository.CountZones(ctx, search)
 	if err != nil {
+		global.Logger.Error("ListZones: failed to count zones", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	zones, err := u.zoneRepository.ListZones(ctx, search, limit32, offset)
 	if err != nil {
+		global.Logger.Error("ListZones: failed to list zones", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	items := make([]dto.ZoneItemDto, 0, len(zones))
 	for _, z := range zones {
 		items = append(items, zoneTransformer.ToZoneItemDto(z))
 	}
+	global.Logger.Info("ListZones: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.Int64("total", total))
 	return &dto.ListZonesResponseDto{
 		Items: items,
 		Pagination: dto_common.PaginationMeta{
@@ -144,11 +163,16 @@ func (u *zoneUsecase) ListZones(ctx context.Context, page int, limit int, search
 }
 
 func (u *zoneUsecase) UpdateZone(ctx context.Context, id uuid.UUID, req *dto.UpdateZoneRequestDto) (*dto.ZoneItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("UpdateZone: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.zoneRepository == nil {
+		global.Logger.Error("UpdateZone: zone repository nil", zap.String(global.KeyCorrelationID, cid))
 		return nil, ErrZoneNotFound
 	}
 	polygonBytes, err := json.Marshal(req.Polygon)
 	if err != nil {
+		global.Logger.Error("UpdateZone: failed to marshal polygon", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	zoneInput := &model.Zone{
@@ -175,8 +199,10 @@ func (u *zoneUsecase) UpdateZone(ctx context.Context, id uuid.UUID, req *dto.Upd
 		},
 	)
 	if err != nil {
+		global.Logger.Error("UpdateZone: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("UpdateZone: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	return &dto.ZoneItemDto{
 		ID:              zone.ID.String(),
 		Code:            zone.Code,
@@ -188,7 +214,11 @@ func (u *zoneUsecase) UpdateZone(ctx context.Context, id uuid.UUID, req *dto.Upd
 }
 
 func (u *zoneUsecase) DeleteZone(ctx context.Context, id uuid.UUID) error {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("DeleteZone: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.zoneRepository == nil {
+		global.Logger.Error("DeleteZone: zone repository nil", zap.String(global.KeyCorrelationID, cid))
 		return ErrZoneNotFound
 	}
 	_, err := database.WithTransaction(
@@ -198,5 +228,10 @@ func (u *zoneUsecase) DeleteZone(ctx context.Context, id uuid.UUID) error {
 			return struct{}{}, u.zoneRepository.DeleteZone(txCtx, id)
 		},
 	)
-	return err
+	if err != nil {
+		global.Logger.Error("DeleteZone: failed to delete zone", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+		return err
+	}
+	global.Logger.Info("DeleteZone: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+	return nil
 }

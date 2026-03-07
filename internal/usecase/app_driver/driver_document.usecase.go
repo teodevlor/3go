@@ -4,21 +4,26 @@ import (
 	"context"
 	"errors"
 
+	"go-structure/global"
 	common "go-structure/internal/common"
 	dto "go-structure/internal/dto/app_driver"
 	"go-structure/internal/helper/database"
-	pgdb "go-structure/orm/db/postgres"
+	"go-structure/internal/middleware"
 	appdriverrepo "go-structure/internal/repository/app_driver"
 	appdrivermodel "go-structure/internal/repository/model/app_driver"
 	appdrivertransformer "go-structure/internal/transformer/app_driver"
+	pgdb "go-structure/orm/db/postgres"
+	"go-structure/pkg/validator"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"go.uber.org/zap"
 )
 
 var (
 	ErrDriverDocumentNotFound = errors.New("không tìm thấy giấy tờ tài xế")
+	ErrDriverProfileNotFound  = errors.New("không tìm thấy hồ sơ tài xế")
 )
 
 type (
@@ -33,13 +38,25 @@ type (
 	}
 
 	driverDocumentUsecase struct {
-		repo      appdriverrepo.IDriverDocumentRepository
-		txManager database.TransactionManager
+		repo             appdriverrepo.IDriverDocumentRepository
+		driverProfileRepo appdriverrepo.IDriverProfileRepository
+		documentTypeRepo  appdriverrepo.IDriverDocumentTypeRepository
+		txManager        database.TransactionManager
 	}
 )
 
-func NewDriverDocumentUsecase(repo appdriverrepo.IDriverDocumentRepository, txManager database.TransactionManager) IDriverDocumentUsecase {
-	return &driverDocumentUsecase{repo: repo, txManager: txManager}
+func NewDriverDocumentUsecase(
+	repo appdriverrepo.IDriverDocumentRepository,
+	driverProfileRepo appdriverrepo.IDriverProfileRepository,
+	documentTypeRepo appdriverrepo.IDriverDocumentTypeRepository,
+	txManager database.TransactionManager,
+) IDriverDocumentUsecase {
+	return &driverDocumentUsecase{
+		repo:              repo,
+		driverProfileRepo: driverProfileRepo,
+		documentTypeRepo:  documentTypeRepo,
+		txManager:         txManager,
+	}
 }
 
 func parseDate(s *string) pgtype.Date {
@@ -65,14 +82,39 @@ func parseStatus(s string) pgdb.DriverDocumentStatus {
 }
 
 func (u *driverDocumentUsecase) Create(ctx context.Context, req *dto.CreateDriverDocumentRequestDto) (*dto.CreateDriverDocumentResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Create: start", zap.String(global.KeyCorrelationID, cid), zap.String("driver_id", req.DriverID), zap.String("document_type_id", req.DocumentTypeID))
+
 	driverID, err := uuid.Parse(req.DriverID)
 	if err != nil {
+		global.Logger.Error("Create: failed to parse driver_id", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	documentTypeID, err := uuid.Parse(req.DocumentTypeID)
 	if err != nil {
+		global.Logger.Error("Create: failed to parse document_type_id", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+
+	if u.driverProfileRepo != nil {
+		if err := validator.CheckExists(ctx, driverID, func(ctx context.Context, id uuid.UUID) error {
+			_, err := u.driverProfileRepo.GetByID(ctx, id)
+			return err
+		}, ErrDriverProfileNotFound); err != nil {
+			global.Logger.Error("Create: failed to validate driver profile", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+			return nil, err
+		}
+	}
+	if u.documentTypeRepo != nil {
+		if err := validator.CheckExists(ctx, documentTypeID, func(ctx context.Context, id uuid.UUID) error {
+			_, err := u.documentTypeRepo.GetByID(ctx, id)
+			return err
+		}, ErrDriverDocumentTypeNotFound); err != nil {
+			global.Logger.Error("Create: failed to validate document type", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+			return nil, err
+		}
+	}
+
 	arg := pgdb.CreateDriverDocumentParams{
 		DriverID:       driverID,
 		DocumentTypeID: documentTypeID,
@@ -89,16 +131,32 @@ func (u *driverDocumentUsecase) Create(ctx context.Context, req *dto.CreateDrive
 		},
 	)
 	if err != nil {
+		global.Logger.Error("Create: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("Create: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("document_id", created.ID.String()))
 	res := appdrivertransformer.ToCreateDriverDocumentResponseDto(created)
 	return &res, nil
 }
 
 func (u *driverDocumentUsecase) BulkCreate(ctx context.Context, req *dto.BulkCreateDriverDocumentsRequestDto) (*dto.BulkCreateDriverDocumentsResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("BulkCreate: start", zap.String(global.KeyCorrelationID, cid), zap.String("driver_id", req.DriverID), zap.Int("item_count", len(req.Items)))
+
 	driverID, err := uuid.Parse(req.DriverID)
 	if err != nil {
+		global.Logger.Error("BulkCreate: failed to parse driver_id", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
+	}
+
+	if u.driverProfileRepo != nil {
+		if err := validator.CheckExists(ctx, driverID, func(ctx context.Context, id uuid.UUID) error {
+			_, err := u.driverProfileRepo.GetByID(ctx, id)
+			return err
+		}, ErrDriverProfileNotFound); err != nil {
+			global.Logger.Error("BulkCreate: failed to validate driver profile", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+			return nil, err
+		}
 	}
 
 	items, err := database.WithTransaction(
@@ -110,6 +168,14 @@ func (u *driverDocumentUsecase) BulkCreate(ctx context.Context, req *dto.BulkCre
 				documentTypeID, err := uuid.Parse(it.DocumentTypeID)
 				if err != nil {
 					return nil, err
+				}
+				if u.documentTypeRepo != nil {
+					if err := validator.CheckExists(txCtx, documentTypeID, func(ctx context.Context, id uuid.UUID) error {
+						_, err := u.documentTypeRepo.GetByID(ctx, id)
+						return err
+					}, ErrDriverDocumentTypeNotFound); err != nil {
+						return nil, err
+					}
 				}
 				arg := pgdb.CreateDriverDocumentParams{
 					DriverID:       driverID,
@@ -128,47 +194,86 @@ func (u *driverDocumentUsecase) BulkCreate(ctx context.Context, req *dto.BulkCre
 		},
 	)
 	if err != nil {
+		global.Logger.Error("BulkCreate: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("BulkCreate: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.Int("item_count", len(items)))
 	return &dto.BulkCreateDriverDocumentsResponseDto{Items: items}, nil
 }
 
 func (u *driverDocumentUsecase) GetByID(ctx context.Context, id uuid.UUID) (*dto.DriverDocumentItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("GetByID: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	m, err := u.repo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			global.Logger.Error("GetByID: document not found", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 			return nil, ErrDriverDocumentNotFound
 		}
+		global.Logger.Error("GetByID: failed to get document", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	if m == nil {
+		global.Logger.Error("GetByID: document not found", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 		return nil, ErrDriverDocumentNotFound
 	}
+	global.Logger.Info("GetByID: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	item := appdrivertransformer.ToDriverDocumentItemDto(m)
 	return &item, nil
 }
 
 func (u *driverDocumentUsecase) ListByDriverID(ctx context.Context, driverID uuid.UUID) (*dto.ListDriverDocumentsResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("ListByDriverID: start", zap.String(global.KeyCorrelationID, cid), zap.String("driver_id", driverID.String()))
+
 	list, err := u.repo.ListByDriverID(ctx, driverID)
 	if err != nil {
+		global.Logger.Error("ListByDriverID: failed to list documents", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	items := make([]dto.DriverDocumentItemDto, 0, len(list))
+	typeCache := make(map[uuid.UUID]dto.DriverDocumentTypeItemDto)
 	for _, m := range list {
-		items = append(items, appdrivertransformer.ToDriverDocumentItemDto(m))
+		item := appdrivertransformer.ToDriverDocumentItemDto(m)
+		if u.documentTypeRepo != nil {
+			var dtDto dto.DriverDocumentTypeItemDto
+			if cached, ok := typeCache[m.DocumentTypeID]; ok {
+				dtDto = cached
+			} else {
+				docType, err := u.documentTypeRepo.GetByID(ctx, m.DocumentTypeID)
+				if err == nil && docType != nil {
+					dtDto = appdrivertransformer.ToDriverDocumentTypeItemDto(docType)
+					typeCache[m.DocumentTypeID] = dtDto
+				}
+			}
+			if dtDto.ID != "" {
+				ptr := new(dto.DriverDocumentTypeItemDto)
+				*ptr = dtDto
+				item.DocumentType = ptr
+			}
+		}
+		items = append(items, item)
 	}
+	global.Logger.Info("ListByDriverID: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("driver_id", driverID.String()), zap.Int("count", len(items)))
 	return &dto.ListDriverDocumentsResponseDto{Items: items}, nil
 }
 
 func (u *driverDocumentUsecase) Update(ctx context.Context, id uuid.UUID, req *dto.UpdateDriverDocumentRequestDto) (*dto.DriverDocumentItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Update: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	existing, err := u.repo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			global.Logger.Error("Update: document not found", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 			return nil, ErrDriverDocumentNotFound
 		}
+		global.Logger.Error("Update: failed to get document", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	if existing == nil {
+		global.Logger.Error("Update: document not found", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 		return nil, ErrDriverDocumentNotFound
 	}
 	arg := pgdb.UpdateDriverDocumentParams{
@@ -192,13 +297,18 @@ func (u *driverDocumentUsecase) Update(ctx context.Context, id uuid.UUID, req *d
 		},
 	)
 	if err != nil {
+		global.Logger.Error("Update: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("Update: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	item := appdrivertransformer.ToDriverDocumentItemDto(updated)
 	return &item, nil
 }
 
 func (u *driverDocumentUsecase) BulkUpdate(ctx context.Context, req *dto.BulkUpdateDriverDocumentsRequestDto) (*dto.BulkUpdateDriverDocumentsResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("BulkUpdate: start", zap.String(global.KeyCorrelationID, cid), zap.Int("item_count", len(req.Items)))
+
 	items, err := database.WithTransaction(
 		u.txManager,
 		ctx,
@@ -235,12 +345,17 @@ func (u *driverDocumentUsecase) BulkUpdate(ctx context.Context, req *dto.BulkUpd
 		},
 	)
 	if err != nil {
+		global.Logger.Error("BulkUpdate: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("BulkUpdate: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.Int("item_count", len(items)))
 	return &dto.BulkUpdateDriverDocumentsResponseDto{Items: items}, nil
 }
 
 func (u *driverDocumentUsecase) Delete(ctx context.Context, id uuid.UUID) error {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Delete: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	_, err := database.WithTransaction(
 		u.txManager,
 		ctx,
@@ -255,5 +370,14 @@ func (u *driverDocumentUsecase) Delete(ctx context.Context, id uuid.UUID) error 
 			return struct{}{}, u.repo.Delete(txCtx, id)
 		},
 	)
-	return err
+	if err != nil {
+		if errors.Is(err, ErrDriverDocumentNotFound) {
+			global.Logger.Error("Delete: document not found", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+		} else {
+			global.Logger.Error("Delete: failed to delete document", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+		}
+		return err
+	}
+	global.Logger.Info("Delete: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+	return nil
 }

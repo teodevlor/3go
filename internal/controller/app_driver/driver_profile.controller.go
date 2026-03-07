@@ -57,7 +57,7 @@ func (ctrl *driverProfileController) RegisterDriver(c *gin.Context) *common.Resp
 	result, err := ctrl.uc.RegisterDriver(c.Request.Context(), &req)
 	if err != nil {
 		if errors.Is(err, usecase.ErrDriverAlreadyRegistered) {
-			return common.ErrorResponse(common.StatusBadRequest, []string{err.Error()})
+			return common.ErrorResponse(common.StatusUnprocessableEntity, []string{err.Error()})
 		}
 		return common.ErrorResponse(common.StatusInternalServerError, []string{err.Error()})
 	}
@@ -193,8 +193,16 @@ func (ctrl *driverProfileController) List(c *gin.Context) *common.ResponseData {
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
 	search := c.DefaultQuery("search", "")
+	globalStatus := c.DefaultQuery("global_status", "")
 
-	result, err := ctrl.uc.List(c.Request.Context(), page, limit, search)
+	filter := usecase.DriverProfileListFilter{
+		Page:         page,
+		Limit:        limit,
+		Search:       search,
+		GlobalStatus: globalStatus,
+	}
+
+	result, err := ctrl.uc.List(c.Request.Context(), filter)
 	if err != nil {
 		return common.ErrorResponse(common.StatusInternalServerError, []string{err.Error()})
 	}

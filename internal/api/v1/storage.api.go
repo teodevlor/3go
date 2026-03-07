@@ -30,6 +30,10 @@ func (s *storageApi) InitStorageApi(router *gin.RouterGroup, storageController c
 			resp := storageController.Upload(c)
 			c.JSON(http.StatusOK, resp)
 		})
+		g.POST("upload/driver-document", func(c *gin.Context) {
+			resp := storageController.UploadDriverDocument(c)
+			c.JSON(http.StatusOK, resp)
+		})
 		g.GET("list", func(c *gin.Context) {
 			resp := storageController.List(c)
 			c.JSON(http.StatusOK, resp)

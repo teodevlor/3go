@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"go-structure/config"
 	v1 "go-structure/internal/api/v1"
@@ -12,6 +13,7 @@ import (
 	controller "go-structure/internal/controller/app_user"
 	websystem_controller "go-structure/internal/controller/web_system"
 	"go-structure/internal/helper/database"
+	"go-structure/internal/middleware"
 	websystem_usecase "go-structure/internal/usecase/web_system"
 
 	"github.com/gin-gonic/gin"
@@ -96,6 +98,8 @@ func buildConfigs() error {
 	return nil
 }
 
+const connectionTimeout = 5 * time.Second
+
 func buildDatabase() error {
 	// Pool Postgres for SQLC (ORM - SQLC)
 	pgPoolDef := di.Def{
@@ -112,13 +116,24 @@ func buildDatabase() error {
 				dbCfg.Port,
 				dbCfg.DBName,
 			)
-			pool, err := pgxpool.New(context.Background(), dsn)
+			poolConfig, err := pgxpool.ParseConfig(dsn)
 			if err != nil {
-				return nil, err
+				return nil, fmt.Errorf("postgres pool parse config failed: %w", err)
 			}
-			if err := pool.Ping(context.Background()); err != nil {
+			poolConfig.MaxConns = int32(dbCfg.MaxOpenConns)
+			poolConfig.MinConns = int32(dbCfg.MaxIdleConns)
+			poolConfig.MaxConnLifetime = time.Duration(dbCfg.ConnMaxLifetime) * time.Second
+			poolConfig.ConnConfig.ConnectTimeout = connectionTimeout
+
+			ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
+			defer cancel()
+			pool, err := pgxpool.NewWithConfig(ctx, poolConfig)
+			if err != nil {
+				return nil, fmt.Errorf("postgres pool create failed: %w", err)
+			}
+			if err := pool.Ping(ctx); err != nil {
 				pool.Close()
-				return nil, err
+				return nil, fmt.Errorf("postgres ping failed: %w", err)
 			}
 			return pool, nil
 		},
@@ -149,15 +164,20 @@ func buildDatabase() error {
 			redisCfg := cfg.Redis
 
 			client := redis.NewClient(&redis.Options{
-				Addr:     redisCfg.Addr,
-				Password: redisCfg.Password,
-				DB:       redisCfg.DB,
-				PoolSize: redisCfg.PoolSize,
+				Addr:         redisCfg.Addr,
+				Password:     redisCfg.Password,
+				DB:           redisCfg.DB,
+				PoolSize:     redisCfg.PoolSize,
+				DialTimeout:  connectionTimeout,
+				ReadTimeout:  connectionTimeout,
+				WriteTimeout: connectionTimeout,
 			})
 
-			if err := client.Ping(context.Background()).Err(); err != nil {
+			ctx, cancel := context.WithTimeout(context.Background(), connectionTimeout)
+			defer cancel()
+			if err := client.Ping(ctx).Err(); err != nil {
 				_ = client.Close()
-				return nil, err
+				return nil, fmt.Errorf("redis ping failed: %w", err)
 			}
 
 			return client, nil
@@ -181,7 +201,9 @@ func buildApis() error {
 		Scope: di.App,
 		Build: func(ctn di.Container) (interface{}, error) {
 			router := gin.Default()
-			// router := gin.New()
+
+			// global logging
+			router.Use(middleware.LoggingMiddleware())
 
 			userProfileController := ctn.Get(UserProfileControllerDIName).(controller.UserProfileController)
 			otpController := ctn.Get(OTPControllerDIName).(otpcontroller.OTPController)

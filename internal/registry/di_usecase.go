@@ -11,10 +11,11 @@ import (
 	usecase_pkg "go-structure/internal/usecase"
 	app_driver_usecase "go-structure/internal/usecase/app_driver"
 	user_profile_usecase "go-structure/internal/usecase/app_user"
+	"go-structure/internal/usecase/web_system"
 	websystem_usecase "go-structure/internal/usecase/web_system"
 
-	"github.com/sarulabs/di"
 	"github.com/redis/go-redis/v9"
+	"github.com/sarulabs/di"
 )
 
 const (
@@ -104,7 +105,7 @@ func buildUsecases() error {
 		Build: func(ctn di.Container) (interface{}, error) {
 			otpRepo := ctn.Get(OTPRepoDIName).(account_repo.IOTPRepository)
 			otpAuditRepo := ctn.Get(OTPAuditRepoDIName).(account_repo.IOTPAuditRepository)
-			settingUc := ctn.Get(SettingUsecaseDIName).(usecase_pkg.ISettingUsecase)
+			settingUc := ctn.Get(SettingUsecaseDIName).(web_system.ISettingUsecase)
 			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
 			notifyUcAny := ctn.Get(NotifyUsecaseDIName)
 
@@ -143,8 +144,9 @@ func buildUsecases() error {
 		Build: func(ctn di.Container) (interface{}, error) {
 			serviceRepo := ctn.Get(ServiceRepoDIName).(settingRepository.IServiceRepository)
 			serviceZoneUc := ctn.Get(ServiceZoneUsecaseDIName).(websystem_usecase.IServiceZoneUsecase)
+			zoneRepo := ctn.Get(ZoneRepoDIName).(account_repo.IZoneRepository)
 			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
-			return websystem_usecase.NewServiceUsecase(serviceRepo, serviceZoneUc, txManager), nil
+			return websystem_usecase.NewServiceUsecase(serviceRepo, serviceZoneUc, zoneRepo, txManager), nil
 		},
 	}
 
@@ -233,8 +235,9 @@ func buildUsecases() error {
 		Build: func(ctn di.Container) (interface{}, error) {
 			roleRepo := ctn.Get(RoleRepoDIName).(settingRepository.IRoleRepository)
 			rolePermissionRepo := ctn.Get(RolePermissionRepoDIName).(settingRepository.IRolePermissionRepository)
+			permissionRepo := ctn.Get(PermissionRepoDIName).(settingRepository.IPermissionRepository)
 			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
-			return websystem_usecase.NewRoleUsecase(roleRepo, rolePermissionRepo, txManager), nil
+			return websystem_usecase.NewRoleUsecase(roleRepo, rolePermissionRepo, permissionRepo, txManager), nil
 		},
 	}
 
@@ -265,8 +268,9 @@ func buildUsecases() error {
 		Scope: di.App,
 		Build: func(ctn di.Container) (interface{}, error) {
 			repo := ctn.Get(DriverDocumentTypeRepoDIName).(app_driver_repo.IDriverDocumentTypeRepository)
+			serviceRepo := ctn.Get(ServiceRepoDIName).(settingRepository.IServiceRepository)
 			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
-			return app_driver_usecase.NewDriverDocumentTypeUsecase(repo, txManager), nil
+			return app_driver_usecase.NewDriverDocumentTypeUsecase(repo, serviceRepo, txManager), nil
 		},
 	}
 
@@ -302,8 +306,10 @@ func buildUsecases() error {
 		Scope: di.App,
 		Build: func(ctn di.Container) (interface{}, error) {
 			driverDocumentRepo := ctn.Get(DriverDocumentRepoDIName).(app_driver_repo.IDriverDocumentRepository)
+			driverProfileRepo := ctn.Get(DriverProfileRepoDIName).(app_driver_repo.IDriverProfileRepository)
+			documentTypeRepo := ctn.Get(DriverDocumentTypeRepoDIName).(app_driver_repo.IDriverDocumentTypeRepository)
 			txManager := ctn.Get(TransactionManagerDIName).(database.TransactionManager)
-			return app_driver_usecase.NewDriverDocumentUsecase(driverDocumentRepo, txManager), nil
+			return app_driver_usecase.NewDriverDocumentUsecase(driverDocumentRepo, driverProfileRepo, documentTypeRepo, txManager), nil
 		},
 	}
 

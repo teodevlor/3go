@@ -1,6 +1,7 @@
 package controller
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -8,9 +9,13 @@ import (
 
 	"go-structure/config"
 	"go-structure/internal/common"
+	"go-structure/internal/dto"
+	driverDto "go-structure/internal/dto/app_driver"
 	"go-structure/internal/usecase"
+	driverUsecase "go-structure/internal/usecase/app_driver"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 )
 
 const (
@@ -27,20 +32,27 @@ type (
 		Upload(c *gin.Context) *common.ResponseData
 		List(c *gin.Context) *common.ResponseData
 		ViewPrivate(c *gin.Context) *common.ResponseData
+		UploadDriverDocument(c *gin.Context) *common.ResponseData
 	}
 
 	storageController struct {
 		*BaseController
-		storageUsecase usecase.IStorageUsecase
-		storageCfg     config.Storage
+		storageUsecase         usecase.IStorageUsecase
+		driverDocumentUsecase  driverUsecase.IDriverDocumentUsecase
+		storageCfg             config.Storage
 	}
 )
 
-func NewStorageController(storageUsecase usecase.IStorageUsecase, storageCfg config.Storage) StorageController {
+func NewStorageController(
+	storageUsecase usecase.IStorageUsecase,
+	driverDocumentUsecase driverUsecase.IDriverDocumentUsecase,
+	storageCfg config.Storage,
+) StorageController {
 	return &storageController{
-		BaseController: NewBaseController(),
-		storageUsecase: storageUsecase,
-		storageCfg:     storageCfg,
+		BaseController:        NewBaseController(),
+		storageUsecase:        storageUsecase,
+		driverDocumentUsecase: driverDocumentUsecase,
+		storageCfg:            storageCfg,
 	}
 }
 
@@ -141,6 +153,78 @@ func (ctl *storageController) List(c *gin.Context) *common.ResponseData {
 		resp["next_page_token"] = result.NextPageToken
 	}
 	return common.SuccessResponse(common.StatusOK, resp)
+}
+
+func (ctl *storageController) UploadDriverDocument(c *gin.Context) *common.ResponseData {
+	var req dto.UploadDriverDocumentRequest
+	if err := c.ShouldBind(&req); err != nil {
+		return common.ErrorResponse(common.StatusBadRequest, []string{"driver_profile_id và document_type_id là bắt buộc"})
+	}
+	if strings.TrimSpace(req.DriverProfileID) == "" {
+		return common.ErrorResponse(common.StatusBadRequest, []string{"driver_profile_id là bắt buộc"})
+	}
+	if strings.TrimSpace(req.DocumentTypeID) == "" {
+		return common.ErrorResponse(common.StatusBadRequest, []string{"document_type_id là bắt buộc"})
+	}
+
+	driverProfileID, err := uuid.Parse(strings.TrimSpace(req.DriverProfileID))
+	if err != nil {
+		return common.ErrorResponse(common.StatusBadRequest, []string{"driver_profile_id không hợp lệ"})
+	}
+
+	documentTypeID := strings.TrimSpace(req.DocumentTypeID)
+	if _, err := uuid.Parse(documentTypeID); err != nil {
+		return common.ErrorResponse(common.StatusBadRequest, []string{"document_type_id không hợp lệ"})
+	}
+
+	file, err := c.FormFile(FormKeyFile)
+	if err != nil || file == nil {
+		return common.ErrorResponse(common.StatusBadRequest, []string{"file là bắt buộc (form-data key: file)"})
+	}
+
+	f, err := file.Open()
+	if err != nil {
+		return common.ErrorResponse(http.StatusInternalServerError, []string{err.Error()})
+	}
+	defer f.Close()
+
+	contentType := file.Header.Get("Content-Type")
+	if contentType == "" {
+		contentType = "application/octet-stream"
+	}
+
+	uploadResult, err := ctl.storageUsecase.UploadDriverDocument(c.Request.Context(), usecase.UploadInput{
+		Bucket:           ctl.storageCfg.BucketPrivate,
+		Body:             f,
+		Size:             file.Size,
+		ContentType:      contentType,
+		OriginalFilename: file.Filename,
+	}, driverProfileID)
+	if err != nil {
+		if errors.Is(err, usecase.ErrDriverDocumentInvalidExtension) || errors.Is(err, usecase.ErrDriverDocumentFileTooLarge) {
+			return common.ErrorResponse(common.StatusBadRequest, []string{err.Error()})
+		}
+		return common.ErrorResponse(http.StatusInternalServerError, []string{err.Error()})
+	}
+
+	dbRecord, err := ctl.driverDocumentUsecase.Create(c.Request.Context(), &driverDto.CreateDriverDocumentRequestDto{
+		DriverID:       driverProfileID.String(),
+		DocumentTypeID: documentTypeID,
+		FileUrl:        uploadResult.Key,
+	})
+	if err != nil {
+		return common.ErrorResponse(http.StatusInternalServerError, []string{"lưu thông tin tài liệu thất bại: " + err.Error()})
+	}
+
+	return common.SuccessResponse(common.StatusOK, dto.UploadDriverDocumentItemResponse{
+		DocumentID:       dbRecord.ID,
+		Key:              uploadResult.Key,
+		Size:             file.Size,
+		OriginalFilename: file.Filename,
+		DriverProfileID:  driverProfileID.String(),
+		DocumentTypeID:   documentTypeID,
+		Bucket:           ctl.storageCfg.BucketPrivate,
+	})
 }
 
 func (ctl *storageController) ViewPrivate(c *gin.Context) *common.ResponseData {

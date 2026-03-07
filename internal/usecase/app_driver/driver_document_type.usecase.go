@@ -5,22 +5,28 @@ import (
 	"errors"
 	"strings"
 
+	"go-structure/global"
 	"go-structure/internal/constants"
 	dto "go-structure/internal/dto/app_driver"
 	dto_common "go-structure/internal/dto/common"
 	"go-structure/internal/helper/database"
-	pgdb "go-structure/orm/db/postgres"
+	"go-structure/internal/middleware"
 	appdriverrepo "go-structure/internal/repository/app_driver"
 	appdrivermodel "go-structure/internal/repository/model/app_driver"
 	appdrivertransformer "go-structure/internal/transformer/app_driver"
+	websystem_repo "go-structure/internal/repository/web_system"
+	pgdb "go-structure/orm/db/postgres"
+	"go-structure/pkg/validator"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"go.uber.org/zap"
 )
 
 var (
 	ErrDriverDocumentTypeNotFound   = errors.New("không tìm thấy loại giấy tờ")
 	ErrDriverDocumentTypeCodeExists = errors.New("mã loại giấy tờ đã tồn tại cho phạm vi này (chung hoặc theo dịch vụ)")
+	ErrServiceNotFoundForDocType    = errors.New("không tìm thấy dịch vụ")
 )
 
 type (
@@ -34,13 +40,22 @@ type (
 	}
 
 	driverDocumentTypeUsecase struct {
-		repo      appdriverrepo.IDriverDocumentTypeRepository
-		txManager database.TransactionManager
+		repo        appdriverrepo.IDriverDocumentTypeRepository
+		serviceRepo websystem_repo.IServiceRepository
+		txManager   database.TransactionManager
 	}
 )
 
-func NewDriverDocumentTypeUsecase(repo appdriverrepo.IDriverDocumentTypeRepository, txManager database.TransactionManager) IDriverDocumentTypeUsecase {
-	return &driverDocumentTypeUsecase{repo: repo, txManager: txManager}
+func NewDriverDocumentTypeUsecase(
+	repo appdriverrepo.IDriverDocumentTypeRepository,
+	serviceRepo websystem_repo.IServiceRepository,
+	txManager database.TransactionManager,
+) IDriverDocumentTypeUsecase {
+	return &driverDocumentTypeUsecase{
+		repo:        repo,
+		serviceRepo: serviceRepo,
+		txManager:   txManager,
+	}
 }
 
 func serviceIDFromString(s *string) *uuid.UUID {
@@ -55,6 +70,19 @@ func serviceIDFromString(s *string) *uuid.UUID {
 }
 
 func (u *driverDocumentTypeUsecase) Create(ctx context.Context, req *dto.CreateDriverDocumentTypeRequestDto) (*dto.CreateDriverDocumentTypeResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Create: start", zap.String(global.KeyCorrelationID, cid), zap.String("code", req.Code))
+
+	if u.serviceRepo != nil {
+		if err := validator.CheckExistsOptionalString(ctx, req.ServiceID, func(ctx context.Context, id uuid.UUID) error {
+			_, err := u.serviceRepo.GetServiceByID(ctx, id)
+			return err
+		}, ErrServiceNotFoundForDocType); err != nil {
+			global.Logger.Error("Create: failed to validate service", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+			return nil, err
+		}
+	}
+
 	serviceID := serviceIDFromString(req.ServiceID)
 	params := pgdb.CreateDriverDocumentTypeParams{
 		Code:              req.Code,
@@ -87,25 +115,36 @@ func (u *driverDocumentTypeUsecase) Create(ctx context.Context, req *dto.CreateD
 		},
 	)
 	if err != nil {
+		global.Logger.Error("Create: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("Create: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", driver_document_type.ID.String()))
 	res := appdrivertransformer.ToCreateDriverDocumentTypeResponseDto(driver_document_type)
 	return &res, nil
 }
 
 func (u *driverDocumentTypeUsecase) GetByID(ctx context.Context, id uuid.UUID) (*dto.DriverDocumentTypeItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("GetByID: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	m, err := u.repo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			global.Logger.Error("GetByID: document type not found", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 			return nil, ErrDriverDocumentTypeNotFound
 		}
+		global.Logger.Error("GetByID: failed to get document type", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("GetByID: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	item := appdrivertransformer.ToDriverDocumentTypeItemDto(m)
 	return &item, nil
 }
 
 func (u *driverDocumentTypeUsecase) List(ctx context.Context, page, limit int, search string, serviceID *string) (*dto.ListDriverDocumentTypesResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("List: start", zap.String(global.KeyCorrelationID, cid), zap.Int("page", page), zap.Int("limit", limit))
+
 	if page < 1 {
 		page = constants.DefaultPage
 	}
@@ -124,6 +163,7 @@ func (u *driverDocumentTypeUsecase) List(ctx context.Context, page, limit int, s
 	if serviceID != nil && *serviceID != "" {
 		sid, err := uuid.Parse(*serviceID)
 		if err != nil {
+			global.Logger.Error("List: failed to parse service_id", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 			return &dto.ListDriverDocumentTypesResponseDto{
 				Items:      nil,
 				Pagination: dto_common.PaginationMeta{Page: page, Limit: limit, Total: 0},
@@ -131,20 +171,24 @@ func (u *driverDocumentTypeUsecase) List(ctx context.Context, page, limit int, s
 		}
 		total, err = u.repo.CountByServiceID(ctx, sid, search)
 		if err != nil {
+			global.Logger.Error("List: failed to count by service", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 			return nil, err
 		}
 		items, err = u.repo.ListByServiceID(ctx, sid, search, limit32, offset)
 		if err != nil {
+			global.Logger.Error("List: failed to list by service", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 			return nil, err
 		}
 	} else {
 		var err error
 		total, err = u.repo.Count(ctx, search)
 		if err != nil {
+			global.Logger.Error("List: failed to count", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 			return nil, err
 		}
 		items, err = u.repo.List(ctx, search, limit32, offset)
 		if err != nil {
+			global.Logger.Error("List: failed to list", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 			return nil, err
 		}
 	}
@@ -153,6 +197,7 @@ func (u *driverDocumentTypeUsecase) List(ctx context.Context, page, limit int, s
 	for _, m := range items {
 		dtos = append(dtos, appdrivertransformer.ToDriverDocumentTypeItemDto(m))
 	}
+	global.Logger.Info("List: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.Int64("total", total))
 	return &dto.ListDriverDocumentTypesResponseDto{
 		Items: dtos,
 		Pagination: dto_common.PaginationMeta{
@@ -164,18 +209,26 @@ func (u *driverDocumentTypeUsecase) List(ctx context.Context, page, limit int, s
 }
 
 func (u *driverDocumentTypeUsecase) GetRequiredByServiceID(ctx context.Context, serviceID uuid.UUID) (*dto.RequiredDriverDocumentTypesResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("GetRequiredByServiceID: start", zap.String(global.KeyCorrelationID, cid), zap.String("service_id", serviceID.String()))
+
 	items, err := u.repo.GetRequiredByServiceID(ctx, serviceID)
 	if err != nil {
+		global.Logger.Error("GetRequiredByServiceID: failed to get required types", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	dtos := make([]dto.DriverDocumentTypeItemDto, 0, len(items))
 	for _, m := range items {
 		dtos = append(dtos, appdrivertransformer.ToDriverDocumentTypeItemDto(m))
 	}
+	global.Logger.Info("GetRequiredByServiceID: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.Int("count", len(dtos)))
 	return &dto.RequiredDriverDocumentTypesResponseDto{Items: dtos}, nil
 }
 
 func (u *driverDocumentTypeUsecase) Update(ctx context.Context, id uuid.UUID, req *dto.UpdateDriverDocumentTypeRequestDto) (*dto.DriverDocumentTypeItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Update: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	serviceID := serviceIDFromString(req.ServiceID)
 	params := pgdb.UpdateDriverDocumentTypeParams{
 		ID:                id,
@@ -218,8 +271,10 @@ func (u *driverDocumentTypeUsecase) Update(ctx context.Context, id uuid.UUID, re
 		},
 	)
 	if err != nil {
+		global.Logger.Error("Update: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("Update: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	item := appdrivertransformer.ToDriverDocumentTypeItemDto(updated)
 	return &item, nil
 }
@@ -235,6 +290,9 @@ func serviceIDEqual(a, b *uuid.UUID) bool {
 }
 
 func (u *driverDocumentTypeUsecase) Delete(ctx context.Context, id uuid.UUID) error {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Delete: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	_, err := database.WithTransaction(
 		u.txManager,
 		ctx,
@@ -249,5 +307,14 @@ func (u *driverDocumentTypeUsecase) Delete(ctx context.Context, id uuid.UUID) er
 			return struct{}{}, u.repo.Delete(txCtx, id)
 		},
 	)
-	return err
+	if err != nil {
+		if errors.Is(err, ErrDriverDocumentTypeNotFound) {
+			global.Logger.Error("Delete: document type not found", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+		} else {
+			global.Logger.Error("Delete: failed to delete document type", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+		}
+		return err
+	}
+	global.Logger.Info("Delete: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+	return nil
 }

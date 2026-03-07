@@ -276,11 +276,12 @@ func (q *Queries) ListDriverDocumentTypesByServiceID(ctx context.Context, arg Li
 const listRequiredDriverDocumentTypesByServiceID = `-- name: ListRequiredDriverDocumentTypesByServiceID :many
 SELECT id, code, name, description, is_required, require_expire_date, service_id, is_active, created_at, deleted_at FROM driver_document_types
 WHERE deleted_at IS NULL
+  AND is_active = true
   AND (service_id = $1 OR service_id IS NULL)
 ORDER BY service_id NULLS LAST, created_at ASC
 `
 
-// Trả về document types áp dụng cho service: theo service_id HOẶC chung (service_id IS NULL).
+// Trả về document types áp dụng cho service: theo service_id HOẶC chung (service_id IS NULL), chỉ lấy bản ghi đang active.
 func (q *Queries) ListRequiredDriverDocumentTypesByServiceID(ctx context.Context, serviceID *uuid.UUID) ([]DriverDocumentType, error) {
 	rows, err := q.db.Query(ctx, listRequiredDriverDocumentTypesByServiceID, serviceID)
 	if err != nil {

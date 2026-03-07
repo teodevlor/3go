@@ -30,6 +30,7 @@ db_mysql:
   connMaxLifetime: 3600
 redis:
   addr: localhost:6379
+  # addr: host.docker.internal:6379
   password: ""
   db: 0
   poolSize: 10
@@ -51,7 +52,7 @@ jwt:
   secret: dev-secret-key
   access_token_ttl: 15m
 storage:
-  endpoint: http://14.168.118.137:9000
+  endpoint: http://103.90.226.96:9000
   access_key: minio
   secret_key: P@ssword2026
   bucket_public: public-assets

@@ -29,11 +29,11 @@ type (
 	UpdateDriverDocumentTypeRequestDto struct {
 		Code              string  `json:"code" binding:"required,max=100"`
 		Name              string  `json:"name" binding:"required,max=255"`
-		Description       string  `json:"description" binding:"required"`
-		IsRequired        bool    `json:"is_required" binding:"required"`
-		RequireExpireDate bool    `json:"require_expire_date" binding:"required"`
+		Description       string  `json:"description"`
+		IsRequired        bool    `json:"is_required"`
+		RequireExpireDate bool    `json:"require_expire_date"`
 		ServiceID         *string `json:"service_id"`
-		IsActive          bool    `json:"is_active" binding:"required"`
+		IsActive          bool    `json:"is_active"`
 	}
 
 	UpdateDriverDocumentTypeResponseDto struct {

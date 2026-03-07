@@ -15,9 +15,18 @@ type HeadObjectResponse struct {
 	Size int64  `json:"size"`
 }
 
-type UploadResponse struct {
-	Key      string `json:"key"`
-	Path     string `json:"path"`
-	FullPath string `json:"full_path"`
-	Size     int64  `json:"size"`
+type UploadDriverDocumentRequest struct {
+	DriverProfileID string `form:"driver_profile_id" binding:"required"`
+	DocumentTypeID  string `form:"document_type_id" binding:"required"`
 }
+
+type UploadDriverDocumentItemResponse struct {
+	DocumentID       string `json:"document_id"`
+	Key              string `json:"key"`
+	Size             int64  `json:"size"`
+	OriginalFilename string `json:"original_filename"`
+	DriverProfileID  string `json:"driver_profile_id"`
+	DocumentTypeID   string `json:"document_type_id"`
+	Bucket           string `json:"bucket"`
+}
+

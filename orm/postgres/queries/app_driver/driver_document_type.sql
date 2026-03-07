@@ -16,9 +16,10 @@ SELECT * FROM driver_document_types
 WHERE id = $1 AND deleted_at IS NULL;
 
 -- name: ListRequiredDriverDocumentTypesByServiceID :many
--- Trả về document types áp dụng cho service: theo service_id HOẶC chung (service_id IS NULL).
+-- Trả về document types áp dụng cho service: theo service_id HOẶC chung (service_id IS NULL), chỉ lấy bản ghi đang active.
 SELECT * FROM driver_document_types
 WHERE deleted_at IS NULL
+  AND is_active = true
   AND (service_id = $1 OR service_id IS NULL)
 ORDER BY service_id NULLS LAST, created_at ASC;
 

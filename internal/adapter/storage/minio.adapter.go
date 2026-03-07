@@ -26,6 +26,10 @@ type (
 	}
 )
 
+const (
+	minioInitTimeout = 5 * time.Second
+)
+
 func NewMinIOAdapter(cfg MinIOConfig) (IStorageAdapter, error) {
 	endpoint, useSSL, err := parseEndpoint(cfg.Endpoint)
 	if err != nil {
@@ -40,14 +44,20 @@ func NewMinIOAdapter(cfg MinIOConfig) (IStorageAdapter, error) {
 		return nil, fmt.Errorf("minio new client: %w", err)
 	}
 
-	ctx := context.Background()
+	ctx, cancel := context.WithTimeout(context.Background(), minioInitTimeout)
+	defer cancel()
 	for _, bucket := range []string{cfg.BucketPublic, cfg.BucketPrivate} {
 		if bucket == "" {
 			continue
 		}
-		exists, _ := client.BucketExists(ctx, bucket)
+		exists, err := client.BucketExists(ctx, bucket)
+		if err != nil {
+			return nil, fmt.Errorf("minio check bucket %q: %w", bucket, err)
+		}
 		if !exists {
-			_ = client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{})
+			if err := client.MakeBucket(ctx, bucket, minio.MakeBucketOptions{}); err != nil {
+				return nil, fmt.Errorf("minio create bucket %q: %w", bucket, err)
+			}
 		}
 	}
 

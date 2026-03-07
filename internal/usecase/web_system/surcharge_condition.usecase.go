@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 
+	"go-structure/global"
 	dto_common "go-structure/internal/dto/common"
 	dto "go-structure/internal/dto/web_system"
 	"go-structure/internal/helper/database"
+	"go-structure/internal/middleware"
 	pgdb "go-structure/orm/db/postgres"
 	websystem_model "go-structure/internal/repository/model/web_system"
 	websystem_repo "go-structure/internal/repository/web_system"
@@ -15,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
+	"go.uber.org/zap"
 )
 
 var (
@@ -48,11 +51,15 @@ func NewSurchargeConditionUsecase(
 }
 
 func (u *surchargeConditionUsecase) Create(ctx context.Context, req *dto.CreateSurchargeConditionRequestDto) (*dto.SurchargeConditionItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Create: start", zap.String(global.KeyCorrelationID, cid), zap.String("code", req.Code))
+
 	if u.repo == nil {
 		return nil, nil
 	}
 
 	if err := websystem_model.ValidateConditionConfig(req.ConditionType, req.Config); err != nil {
+		global.Logger.Error("Create: failed to validate condition config", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 
@@ -77,28 +84,40 @@ func (u *surchargeConditionUsecase) Create(ctx context.Context, req *dto.CreateS
 		},
 	)
 	if err != nil {
+		global.Logger.Error("Create: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("Create: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", condition.ID.String()))
 	item := serviceTransformer.ToSurchargeConditionItemDto(condition)
 	return &item, nil
 }
 
 func (u *surchargeConditionUsecase) GetByID(ctx context.Context, id uuid.UUID) (*dto.SurchargeConditionItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("GetByID: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.repo == nil {
+		global.Logger.Error("GetByID: repository nil", zap.String(global.KeyCorrelationID, cid))
 		return nil, ErrSurchargeConditionNotFound
 	}
 	cond, err := u.repo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			global.Logger.Error("GetByID: condition not found", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 			return nil, ErrSurchargeConditionNotFound
 		}
+		global.Logger.Error("GetByID: failed to get condition", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("GetByID: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	item := serviceTransformer.ToSurchargeConditionItemDto(cond)
 	return &item, nil
 }
 
 func (u *surchargeConditionUsecase) List(ctx context.Context) (*dto.ListSurchargeConditionsResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("List: start", zap.String(global.KeyCorrelationID, cid))
+
 	if u.repo == nil {
 		return &dto.ListSurchargeConditionsResponseDto{
 			Items:      nil,
@@ -107,8 +126,10 @@ func (u *surchargeConditionUsecase) List(ctx context.Context) (*dto.ListSurcharg
 	}
 	conds, err := u.repo.List(ctx)
 	if err != nil {
+		global.Logger.Error("List: failed to list conditions", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("List: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.Int("count", len(conds)))
 	items := make([]dto.SurchargeConditionItemDto, 0, len(conds))
 	for _, c := range conds {
 		items = append(items, serviceTransformer.ToSurchargeConditionItemDto(c))
@@ -124,11 +145,16 @@ func (u *surchargeConditionUsecase) List(ctx context.Context) (*dto.ListSurcharg
 }
 
 func (u *surchargeConditionUsecase) Update(ctx context.Context, id uuid.UUID, req *dto.UpdateSurchargeConditionRequestDto) (*dto.SurchargeConditionItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Update: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.repo == nil {
+		global.Logger.Error("Update: repository nil", zap.String(global.KeyCorrelationID, cid))
 		return nil, ErrSurchargeConditionNotFound
 	}
 
 	if err := websystem_model.ValidateConditionConfig(req.ConditionType, req.Config); err != nil {
+		global.Logger.Error("Update: failed to validate condition config", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 
@@ -164,14 +190,20 @@ func (u *surchargeConditionUsecase) Update(ctx context.Context, id uuid.UUID, re
 		},
 	)
 	if err != nil {
+		global.Logger.Error("Update: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("Update: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	item := serviceTransformer.ToSurchargeConditionItemDto(cond)
 	return &item, nil
 }
 
 func (u *surchargeConditionUsecase) Delete(ctx context.Context, id uuid.UUID) error {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Delete: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.repo == nil {
+		global.Logger.Error("Delete: repository nil", zap.String(global.KeyCorrelationID, cid))
 		return ErrSurchargeConditionNotFound
 	}
 	_, err := database.WithTransaction(
@@ -187,5 +219,10 @@ func (u *surchargeConditionUsecase) Delete(ctx context.Context, id uuid.UUID) er
 			return struct{}{}, nil
 		},
 	)
-	return err
+	if err != nil {
+		global.Logger.Error("Delete: failed to delete condition", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+		return err
+	}
+	global.Logger.Info("Delete: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+	return nil
 }

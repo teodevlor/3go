@@ -18,28 +18,37 @@ import (
 )
 
 func main() {
+	startTotal := time.Now()
+
 	// 1. Build DI
+	t := time.Now()
 	registry.BuildDependencyInjectContainer()
+	fmt.Printf("[startup] BuildDI done in %s\n", time.Since(t))
 
 	// 2. Resolve dependencies
+	t = time.Now()
 	cfg := registry.GetDependency(registry.ConfigDIName).(*config.Config)
 	router := registry.GetDependency(registry.ApiDIName).(http.Handler)
+	fmt.Printf("[startup] ResolveDeps done in %s\n", time.Since(t))
 
 	// 3. Global config & logger
 	global.Config = *cfg
-	global.Logger = logger.NewLoggerApplication(cfg.Logger)
+	// global.Logger = logger.NewLoggerApplication(cfg.Logger) // ghi ra file
+	global.Logger = logger.NewStdoutLoggerApplication(cfg.Logger)
 	zap.ReplaceGlobals(global.Logger.Logger)
 
 	_ = registry.GetDependency(registry.RedisClientDIName)
 
 	// Logger theo channel (auth -> auth.log, http -> http.log, ...)
 	global.ChannelLoggers = make(map[string]*logger.LoggerZap)
-	for name, filePath := range cfg.Logger.Channels {
-		if name == "" || filePath == "" {
+	for name := range cfg.Logger.Channels {
+		if name == "" {
 			continue
 		}
-		global.ChannelLoggers[name] = logger.NewChannelLogger(cfg.Logger, name, filePath)
+		global.ChannelLoggers[name] = logger.NewStdoutChannelLogger(cfg.Logger, name)
 	}
+
+	fmt.Printf("[startup] Total startup done in %s\n", time.Since(startTotal))
 
 	// 4. HTTP server
 	server := &http.Server{

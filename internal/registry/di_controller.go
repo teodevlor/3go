@@ -58,8 +58,9 @@ func buildControllers() error {
 		Scope: di.App,
 		Build: func(ctn di.Container) (interface{}, error) {
 			uc := ctn.Get(StorageUsecaseDIName).(usecase_pkg.IStorageUsecase)
+			driverDocumentUc := ctn.Get(DriverDocumentUsecaseDIName).(app_driver_usecase.IDriverDocumentUsecase)
 			cfg := ctn.Get(ConfigDIName).(*config.Config)
-			return otpcontroller.NewStorageController(uc, cfg.Storage), nil
+			return otpcontroller.NewStorageController(uc, driverDocumentUc, cfg.Storage), nil
 		},
 	}
 

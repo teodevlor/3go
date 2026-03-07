@@ -2,14 +2,23 @@ root = "."
 tmp_dir = "cmd/tmp"
 
 [build]
-  cmd = "go build -tags=dev -gcflags='all=-N -l' -trimpath -o cmd/tmp/app cmd/server/main.go"
+  cmd = "go build -tags=dev -trimpath -o cmd/tmp/app ./cmd/server"
   bin = "cmd/tmp/app"
-  delay = 200
+  delay = 300
   poll = false
   send_interrupt = true
   kill_delay = 500
 
   include_ext = ["go"]
+
+  include_dir = [
+    "cmd",
+    "internal",
+    "pkg",
+    "config",
+    "global",
+    "orm"
+  ]
 
   exclude_dir = [
     "cmd/tmp",
@@ -19,7 +28,10 @@ tmp_dir = "cmd/tmp"
     "docs-internal",
     "node_modules",
     "storage",
-    "migrations",
+    "storage/logs",
+    "scripts",
+    "docker",
+    "orm/postgres/migrations",
     ".git"
   ]
 

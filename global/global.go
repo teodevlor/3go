@@ -5,6 +5,10 @@ import (
 	applogger "go-structure/internal/helper/logger"
 )
 
+const (
+	KeyCorrelationID = "correlation_id"
+)
+
 var (
 	Config         config.Config
 	Logger         *applogger.LoggerZap

@@ -8,13 +8,16 @@ import (
 	"go-structure/global"
 	common "go-structure/internal/common"
 	"go-structure/internal/constants"
+	"go-structure/internal/middleware"
 	dto_common "go-structure/internal/dto/common"
 	dto "go-structure/internal/dto/web_system"
 	"go-structure/internal/helper/database"
 	pgdb "go-structure/orm/db/postgres"
+	account_repo "go-structure/internal/repository"
 	websystem "go-structure/internal/repository/model/web_system"
 	websystem_repo "go-structure/internal/repository/web_system"
 	serviceTransformer "go-structure/internal/transformer/web_system"
+	"go-structure/pkg/validator"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -38,14 +41,21 @@ type (
 	serviceUsecase struct {
 		serviceRepository  websystem_repo.IServiceRepository
 		serviceZoneUsecase IServiceZoneUsecase
+		zoneRepo           account_repo.IZoneRepository
 		transactionManager database.TransactionManager
 	}
 )
 
-func NewServiceUsecase(serviceRepository websystem_repo.IServiceRepository, serviceZoneUsecase IServiceZoneUsecase, transactionManager database.TransactionManager) IServiceUsecase {
+func NewServiceUsecase(
+	serviceRepository websystem_repo.IServiceRepository,
+	serviceZoneUsecase IServiceZoneUsecase,
+	zoneRepo account_repo.IZoneRepository,
+	transactionManager database.TransactionManager,
+) IServiceUsecase {
 	return &serviceUsecase{
 		serviceRepository:  serviceRepository,
 		serviceZoneUsecase: serviceZoneUsecase,
+		zoneRepo:           zoneRepo,
 		transactionManager: transactionManager,
 	}
 }
@@ -70,12 +80,25 @@ func parseZoneIDs(zoneIDs []string) ([]uuid.UUID, error) {
 }
 
 func (u *serviceUsecase) CreateService(ctx context.Context, req *dto.CreateServiceRequestDto) (*dto.CreateServiceResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("CreateService: start", zap.String(global.KeyCorrelationID, cid), zap.String("code", req.Code))
+
 	if u.serviceRepository == nil || u.serviceZoneUsecase == nil {
 		return nil, nil
 	}
 	zoneUUIDs, err := parseZoneIDs(req.ZoneIDs)
 	if err != nil {
+		global.Logger.Error("CreateService: failed to parse zone IDs", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
+	}
+	if u.zoneRepo != nil {
+		if err := validator.CheckExistsMany(ctx, zoneUUIDs, func(ctx context.Context, id uuid.UUID) error {
+			_, err := u.zoneRepo.GetZoneByID(ctx, id)
+			return err
+		}, ErrZoneNotFound); err != nil {
+			global.Logger.Error("CreateService: failed to validate zones", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+			return nil, err
+		}
 	}
 	params := pgdb.CreateServiceParams{
 		Code:      req.Code,
@@ -105,9 +128,10 @@ func (u *serviceUsecase) CreateService(ctx context.Context, req *dto.CreateServi
 		},
 	)
 	if err != nil {
+		global.Logger.Error("CreateService: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
-	global.GetChannelLogger("service").Info("create service", zap.Any("service", svc))
+	global.Logger.Info("CreateService: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("service_id", svc.ID.String()))
 	zoneIDStrs := make([]string, 0, len(zoneUUIDs))
 	for _, id := range zoneUUIDs {
 		zoneIDStrs = append(zoneIDStrs, id.String())
@@ -124,14 +148,20 @@ func (u *serviceUsecase) CreateService(ctx context.Context, req *dto.CreateServi
 }
 
 func (u *serviceUsecase) GetService(ctx context.Context, id uuid.UUID) (*dto.ServiceItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("GetService: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.serviceRepository == nil || u.serviceZoneUsecase == nil {
+		global.Logger.Error("GetService: repository nil", zap.String(global.KeyCorrelationID, cid))
 		return nil, ErrServiceNotFound
 	}
 	svc, err := u.serviceRepository.GetServiceByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			global.Logger.Error("GetService: service not found", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 			return nil, ErrServiceNotFound
 		}
+		global.Logger.Error("GetService: failed to get service", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	zoneIDs, _ := u.serviceZoneUsecase.GetZoneIDsByServiceID(ctx, id)
@@ -139,11 +169,15 @@ func (u *serviceUsecase) GetService(ctx context.Context, id uuid.UUID) (*dto.Ser
 	for _, zid := range zoneIDs {
 		zoneIDStrs = append(zoneIDStrs, zid.String())
 	}
+	global.Logger.Info("GetService: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	item := serviceTransformer.ToServiceItemDto(svc, zoneIDStrs)
 	return &item, nil
 }
 
 func (u *serviceUsecase) ListServices(ctx context.Context, page int, limit int, search string) (*dto.ListServicesResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("ListServices: start", zap.String(global.KeyCorrelationID, cid), zap.Int("page", page), zap.Int("limit", limit))
+
 	if u.serviceRepository == nil || u.serviceZoneUsecase == nil {
 		return &dto.ListServicesResponseDto{Items: nil, Pagination: dto_common.PaginationMeta{Page: page, Limit: limit, Total: 0}}, nil
 	}
@@ -162,10 +196,12 @@ func (u *serviceUsecase) ListServices(ctx context.Context, page int, limit int, 
 
 	total, err := u.serviceRepository.CountServices(ctx, search)
 	if err != nil {
+		global.Logger.Error("ListServices: failed to count", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	services, err := u.serviceRepository.ListServices(ctx, search, limit32, offset)
 	if err != nil {
+		global.Logger.Error("ListServices: failed to list", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	items := make([]dto.ServiceItemDto, 0, len(services))
@@ -177,6 +213,7 @@ func (u *serviceUsecase) ListServices(ctx context.Context, page int, limit int, 
 		}
 		items = append(items, serviceTransformer.ToServiceItemDto(s, zoneIDStrs))
 	}
+	global.Logger.Info("ListServices: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.Int64("total", total))
 	return &dto.ListServicesResponseDto{
 		Items: items,
 		Pagination: dto_common.PaginationMeta{
@@ -188,12 +225,25 @@ func (u *serviceUsecase) ListServices(ctx context.Context, page int, limit int, 
 }
 
 func (u *serviceUsecase) UpdateService(ctx context.Context, id uuid.UUID, req *dto.UpdateServiceRequestDto) (*dto.ServiceItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("UpdateService: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.serviceRepository == nil || u.serviceZoneUsecase == nil {
 		return nil, ErrServiceNotFound
 	}
 	zoneUUIDs, err := parseZoneIDs(req.ZoneIDs)
 	if err != nil {
+		global.Logger.Error("UpdateService: failed to parse zone IDs", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
+	}
+	if u.zoneRepo != nil {
+		if err := validator.CheckExistsMany(ctx, zoneUUIDs, func(ctx context.Context, id uuid.UUID) error {
+			_, err := u.zoneRepo.GetZoneByID(ctx, id)
+			return err
+		}, ErrZoneNotFound); err != nil {
+			global.Logger.Error("UpdateService: failed to validate zones", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+			return nil, err
+		}
 	}
 	params := pgdb.UpdateServiceParams{
 		ID:        id,
@@ -222,18 +272,24 @@ func (u *serviceUsecase) UpdateService(ctx context.Context, id uuid.UUID, req *d
 		},
 	)
 	if err != nil {
+		global.Logger.Error("UpdateService: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	zoneIDStrs := make([]string, 0, len(zoneUUIDs))
 	for _, zid := range zoneUUIDs {
 		zoneIDStrs = append(zoneIDStrs, zid.String())
 	}
+	global.Logger.Info("UpdateService: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	item := serviceTransformer.ToServiceItemDto(svc, zoneIDStrs)
 	return &item, nil
 }
 
 func (u *serviceUsecase) DeleteService(ctx context.Context, id uuid.UUID) error {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("DeleteService: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.serviceRepository == nil {
+		global.Logger.Error("DeleteService: repository nil", zap.String(global.KeyCorrelationID, cid))
 		return ErrServiceNotFound
 	}
 	_, err := database.WithTransaction(
@@ -243,5 +299,10 @@ func (u *serviceUsecase) DeleteService(ctx context.Context, id uuid.UUID) error 
 			return struct{}{}, u.serviceRepository.DeleteService(txCtx, id)
 		},
 	)
-	return err
+	if err != nil {
+		global.Logger.Error("DeleteService: failed to delete service", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+		return err
+	}
+	global.Logger.Info("DeleteService: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+	return nil
 }

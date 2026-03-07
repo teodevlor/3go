@@ -5,8 +5,10 @@ import (
 	"errors"
 	"time"
 
+	"go-structure/global"
 	websystemdto "go-structure/internal/dto/web_system"
 	"go-structure/internal/helper/database"
+	"go-structure/internal/middleware"
 	"go-structure/internal/repository/model"
 	websystemrepo "go-structure/internal/repository/web_system"
 	websystemtransformer "go-structure/internal/transformer/web_system"
@@ -15,6 +17,7 @@ import (
 	"go-structure/pkg/validator"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type (
@@ -70,6 +73,9 @@ func NewAuthAdminUsecase(
 }
 
 func (u *authAdminUsecase) LoginAdmin(ctx context.Context, req *websystemdto.AdminLoginRequestDto, ip string, userAgent string) (*websystemdto.AdminLoginResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("LoginAdmin: start", zap.String(global.KeyCorrelationID, cid), zap.String("email", req.Email))
+
 	type txResult struct {
 		admin        *model.SystemAdmin
 		refreshToken string
@@ -81,6 +87,7 @@ func (u *authAdminUsecase) LoginAdmin(ctx context.Context, req *websystemdto.Adm
 		func(txCtx context.Context) (txResult, error) {
 			admin, err := u.getAdminForLogin(txCtx, req.Email, req.Password)
 			if err != nil {
+				global.Logger.Error("LoginAdmin: failed to get admin for login", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 				_ = u.logLoginHistory(txCtx, uuid.Nil, ip, userAgent, err, req.Email)
 				return txResult{}, err
 			}
@@ -111,14 +118,17 @@ func (u *authAdminUsecase) LoginAdmin(ctx context.Context, req *websystemdto.Adm
 		},
 	)
 	if err != nil {
+		global.Logger.Error("LoginAdmin: failed", zap.String(global.KeyCorrelationID, cid), zap.String("email", req.Email), zap.Error(err))
 		return nil, err
 	}
 
 	accessToken, accessTokenExpiresAt, err := jwtutil.GenerateAdminAccessToken(res.admin.ID)
 	if err != nil {
+		global.Logger.Error("LoginAdmin: failed to generate access token", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 
+	global.Logger.Info("LoginAdmin: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("email", req.Email), zap.String("admin_id", res.admin.ID.String()))
 	roles, permissions := u.getAdminRolesAndPermissions(ctx, res.admin.ID)
 	resp := websystemtransformer.ToAdminLoginResponseDto(accessToken, res.refreshToken, accessTokenExpiresAt, res.admin, roles, permissions)
 	return &resp, nil
@@ -226,6 +236,9 @@ func (u *authAdminUsecase) logLoginHistory(
 }
 
 func (u *authAdminUsecase) RefreshToken(ctx context.Context, refreshToken string, ip string, userAgent string) (*websystemdto.AdminRefreshTokenResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("RefreshToken: start", zap.String(global.KeyCorrelationID, cid))
+
 	type txResult struct {
 		admin      *model.SystemAdmin
 		newRefresh string
@@ -280,9 +293,11 @@ func (u *authAdminUsecase) RefreshToken(ctx context.Context, refreshToken string
 		},
 	)
 	if err != nil {
+		global.Logger.Error("RefreshToken: failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 
+	global.Logger.Info("RefreshToken: completed successfully", zap.String(global.KeyCorrelationID, cid))
 	resp := websystemtransformer.ToAdminRefreshTokenResponseDto(res.newAccess, res.newRefresh)
 	return &resp, nil
 }

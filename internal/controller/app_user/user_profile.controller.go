@@ -50,6 +50,9 @@ func (ctl *userProfileController) RegisterUserProfile(c *gin.Context) *common.Re
 	}
 	result, err := ctl.userProfileUsecase.RegisterUserProfile(c.Request.Context(), &req)
 	if err != nil {
+		if errors.Is(err, usecase.ErrUserAlreadyRegistered) {
+			return common.ErrorResponse(common.StatusUnprocessableEntity, []string{err.Error()})
+		}
 		return common.ErrorResponse(common.StatusInternalServerError, []string{err.Error()})
 	}
 	return common.SuccessResponse(common.StatusOK, result)
@@ -65,7 +68,7 @@ func (ctl *userProfileController) ActiveUserProfile(c *gin.Context) *common.Resp
 	verified, err := ctl.userProfileUsecase.ActiveUserProfile(c.Request.Context(), req.Phone, req.Code, clientInfo.IP, clientInfo.UserAgent)
 	if err != nil {
 		if errors.Is(err, usecase.ErrUserAlreadyActive) {
-			return common.ErrorResponse(common.StatusBadRequest, []string{err.Error()})
+			return common.ErrorResponse(common.StatusUnprocessableEntity, []string{err.Error()})
 		}
 		if errors.Is(err, usecase.ErrInvalidOTP) {
 			return common.ErrorResponse(common.StatusBadRequest, []string{err.Error()})

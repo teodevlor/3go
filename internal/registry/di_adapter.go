@@ -1,8 +1,6 @@
 package registry
 
 import (
-	"strings"
-
 	"go-structure/config"
 	"go-structure/internal/adapter"
 	"go-structure/internal/adapter/storage"
@@ -32,23 +30,14 @@ func buildAdapters() error {
 		Build: func(ctn di.Container) (interface{}, error) {
 			cfg := ctn.Get(ConfigDIName).(*config.Config)
 			s := cfg.Storage
-			if strings.EqualFold(strings.TrimSpace(s.Provider), "minio") {
-				minioCfg := storage.MinIOConfig{
-					Endpoint:      s.Endpoint,
-					AccessKey:     s.AccessKey,
-					SecretKey:     s.SecretKey,
-					BucketPublic:  s.BucketPublic,
-					BucketPrivate: s.BucketPrivate,
-				}
-				return storage.NewMinIOAdapter(minioCfg)
+			minioCfg := storage.MinIOConfig{
+				Endpoint:      s.Endpoint,
+				AccessKey:     s.AccessKey,
+				SecretKey:     s.SecretKey,
+				BucketPublic:  s.BucketPublic,
+				BucketPrivate: s.BucketPrivate,
 			}
-			s3cfg := storage.S3Config{
-				Endpoint:  s.Endpoint,
-				AccessKey: s.AccessKey,
-				SecretKey: s.SecretKey,
-				Provider:  s.Provider,
-			}
-			return storage.NewS3Adapter(s3cfg)
+			return storage.NewMinIOAdapter(minioCfg)
 		},
 	}
 	return builder.Add(telegramDef, storageDef)

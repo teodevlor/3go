@@ -3,14 +3,15 @@ package websystem
 import (
 	"fmt"
 
+	"go-structure/internal/common"
 	"go-structure/internal/repository/model"
 
 	"github.com/google/uuid"
 )
 
 const (
-	SurchargeUnitPercent = "percent"
-	SurchargeUnitFixed   = "fixed"
+	SurchargeUnitPercent = common.SurchargeUnitPercent
+	SurchargeUnitFixed   = common.SurchargeUnitFixed
 )
 
 type SurchargeRule struct {

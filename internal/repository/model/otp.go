@@ -3,14 +3,16 @@ package model
 import (
 	"time"
 
+	"go-structure/internal/common"
+
 	"github.com/google/uuid"
 )
 
 const (
-	OTPStatusActive  = "active"
-	OTPStatusUsed    = "used"
-	OTPStatusExpired = "expired"
-	OTPStatusLocked  = "locked"
+	OTPStatusActive  = common.OTPStatusActive
+	OTPStatusUsed    = common.OTPStatusUsed
+	OTPStatusExpired = common.OTPStatusExpired
+	OTPStatusLocked  = common.OTPStatusLocked
 )
 
 type OTP struct {

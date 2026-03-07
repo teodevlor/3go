@@ -113,6 +113,10 @@ func (a *appDriverApi) InitAppDriverApi(
 			resp := a.driverProfileController.GetByID(c)
 			c.JSON(http.StatusOK, resp)
 		})
+		protected.GET("driver_profiles/:id/documents", middleware.RequirePermission(permissionChecker, constants.PermissionDriverDocumentList), func(c *gin.Context) {
+			resp := a.driverDocumentController.ListByDriverID(c)
+			c.JSON(http.StatusOK, resp)
+		})
 		protected.PUT("driver_profiles/:id", middleware.RequirePermission(permissionChecker, constants.PermissionDriverProfileUpdate), func(c *gin.Context) {
 			resp := a.driverProfileController.Update(c)
 			c.JSON(http.StatusOK, resp)
@@ -159,6 +163,10 @@ func (a *appDriverApi) InitAppDriverApi(
 		})
 		protected.PUT("documents/:id", middleware.RequirePermission(permissionChecker, constants.PermissionDriverDocumentUpdate), func(c *gin.Context) {
 			resp := a.driverDocumentController.Update(c)
+			c.JSON(http.StatusOK, resp)
+		})
+		protected.PUT("documents/:id/status", middleware.RequirePermission(permissionChecker, constants.PermissionDriverDocumentUpdate), func(c *gin.Context) {
+			resp := a.driverDocumentController.UpdateStatus(c)
 			c.JSON(http.StatusOK, resp)
 		})
 		protected.PATCH("documents/bulk", func(c *gin.Context) {

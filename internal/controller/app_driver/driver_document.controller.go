@@ -20,6 +20,7 @@ type (
 		GetByID(c *gin.Context) *common.ResponseData
 		ListByDriverID(c *gin.Context) *common.ResponseData
 		Update(c *gin.Context) *common.ResponseData
+		UpdateStatus(c *gin.Context) *common.ResponseData
 		BulkUpdate(c *gin.Context) *common.ResponseData
 		Delete(c *gin.Context) *common.ResponseData
 	}
@@ -81,7 +82,7 @@ func (ctrl *driverDocumentController) GetByID(c *gin.Context) *common.ResponseDa
 func (ctrl *driverDocumentController) ListByDriverID(c *gin.Context) *common.ResponseData {
 	driverIDStr := c.Param("driver_id")
 	if driverIDStr == "" {
-		driverIDStr = c.Query("driver_id")
+		driverIDStr = c.Param("id")
 	}
 	if driverIDStr == "" {
 		return common.ErrorResponse(common.StatusBadRequest, []string{"driver_id là bắt buộc"})
@@ -115,6 +116,41 @@ func (ctrl *driverDocumentController) Update(c *gin.Context) *common.ResponseDat
 		return common.ErrorResponse(common.StatusInternalServerError, []string{err.Error()})
 	}
 	return common.SuccessResponse(common.StatusOK, result)
+}
+
+func (ctrl *driverDocumentController) UpdateStatus(c *gin.Context) *common.ResponseData {
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		return common.ErrorResponse(common.StatusBadRequest, []string{"id không hợp lệ"})
+	}
+
+	var req dto.UpdateDriverDocumentStatusRequestDto
+	if err := c.ShouldBindJSON(&req); err != nil {
+		msgs := validator.Translate(err)
+		return common.ErrorResponse(common.StatusUnprocessableEntity, msgs)
+	}
+
+	status := req.Status
+	updateReq := dto.BulkUpdateDriverDocumentsRequestDto{
+		Items: []dto.BulkUpdateDriverDocumentItemDto{
+			{
+				ID:     id.String(),
+				Status: &status,
+			},
+		},
+	}
+
+	result, err := ctrl.uc.BulkUpdate(c.Request.Context(), &updateReq)
+	if err != nil {
+		if errors.Is(err, usecase.ErrDriverDocumentNotFound) {
+			return common.ErrorResponse(common.StatusNotFound, []string{err.Error()})
+		}
+		return common.ErrorResponse(common.StatusInternalServerError, []string{err.Error()})
+	}
+	if len(result.Items) == 0 {
+		return common.ErrorResponse(common.StatusInternalServerError, []string{"cập nhật trạng thái thất bại"})
+	}
+	return common.SuccessResponse(common.StatusOK, result.Items[0])
 }
 
 func (ctrl *driverDocumentController) BulkUpdate(c *gin.Context) *common.ResponseData {

@@ -13,6 +13,7 @@ import (
 type (
 	IDriverServiceRepository interface {
 		SetDriverServices(ctx context.Context, driverID uuid.UUID, serviceIDs []uuid.UUID) error
+		GetServiceIDsByDriverID(ctx context.Context, driverID uuid.UUID) ([]uuid.UUID, error)
 	}
 
 	driverServiceRepository struct {
@@ -44,4 +45,17 @@ func (r *driverServiceRepository) SetDriverServices(ctx context.Context, driverI
 		}
 	}
 	return nil
+}
+
+func (r *driverServiceRepository) GetServiceIDsByDriverID(ctx context.Context, driverID uuid.UUID) ([]uuid.UUID, error) {
+	db := r.getDB(ctx)
+	services, err := db.GetDriverServicesByDriverID(ctx, driverID)
+	if err != nil {
+		return nil, err
+	}
+	ids := make([]uuid.UUID, 0, len(services))
+	for _, s := range services {
+		ids = append(ids, s.ServiceID)
+	}
+	return ids, nil
 }

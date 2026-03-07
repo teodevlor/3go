@@ -20,8 +20,8 @@ type (
 		Create(ctx context.Context, accountID uuid.UUID, fullName string) (*appdrivermodel.DriverProfile, error)
 		GetByAccountID(ctx context.Context, accountID uuid.UUID) (*appdrivermodel.DriverProfile, error)
 		GetByID(ctx context.Context, id uuid.UUID) (*appdrivermodel.DriverProfile, error)
-		List(ctx context.Context, search string, limit, offset int32) ([]*appdrivermodel.DriverProfile, error)
-		Count(ctx context.Context, search string) (int64, error)
+		List(ctx context.Context, search, globalStatus string, limit, offset int32) ([]*appdrivermodel.DriverProfile, error)
+		Count(ctx context.Context, search, globalStatus string) (int64, error)
 		Update(ctx context.Context, arg pgdb.UpdateDriverProfileParams) (*appdrivermodel.DriverProfile, error)
 		UpdateStatus(ctx context.Context, id uuid.UUID, status pgdb.DriverProfileStatus) (*appdrivermodel.DriverProfile, error)
 		CreateStatusHistory(ctx context.Context, driverID uuid.UUID, fromStatus pgdb.NullDriverProfileStatus, toStatus pgdb.DriverProfileStatus, changedBy *uuid.UUID, reason *string) error
@@ -130,10 +130,11 @@ func (r *driverProfileRepository) GetByID(ctx context.Context, id uuid.UUID) (*a
 	return appdrivermapper.ToDriverProfileFromRow(&row), nil
 }
 
-func (r *driverProfileRepository) List(ctx context.Context, search string, limit, offset int32) ([]*appdrivermodel.DriverProfile, error) {
+func (r *driverProfileRepository) List(ctx context.Context, search, globalStatus string, limit, offset int32) ([]*appdrivermodel.DriverProfile, error) {
 	db := r.getDB(ctx)
 	rows, err := db.ListDriverProfiles(ctx, pgdb.ListDriverProfilesParams{
 		Column1: search,
+		Column2: globalStatus,
 		Limit:   limit,
 		Offset:  offset,
 	})
@@ -147,9 +148,12 @@ func (r *driverProfileRepository) List(ctx context.Context, search string, limit
 	return out, nil
 }
 
-func (r *driverProfileRepository) Count(ctx context.Context, search string) (int64, error) {
+func (r *driverProfileRepository) Count(ctx context.Context, search, globalStatus string) (int64, error) {
 	db := r.getDB(ctx)
-	return db.CountDriverProfiles(ctx, search)
+	return db.CountDriverProfiles(ctx, pgdb.CountDriverProfilesParams{
+		Column1: search,
+		Column2: globalStatus,
+	})
 }
 
 func (r *driverProfileRepository) Delete(ctx context.Context, id uuid.UUID) error {

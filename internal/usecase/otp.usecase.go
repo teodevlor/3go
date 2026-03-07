@@ -6,15 +6,19 @@ import (
 	"strings"
 	"time"
 
+	"go-structure/global"
 	"go-structure/internal/common"
 	"go-structure/internal/constants"
 	"go-structure/internal/dto"
 	"go-structure/internal/helper/database"
+	"go-structure/internal/middleware"
 	"go-structure/internal/repository"
 	"go-structure/internal/setting"
+	"go-structure/internal/usecase/web_system"
 	"go-structure/internal/utils/generate"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type (
@@ -28,30 +32,30 @@ type (
 	otpUsecase struct {
 		otpRepository      repository.IOTPRepository
 		otpAuditRepository repository.IOTPAuditRepository
-		settingUsecase     ISettingUsecase
+		settingUsecase     web_system.ISettingUsecase
 		notifyUsecase      INotifyUsecase
 		txManager          database.TransactionManager
 	}
 )
 
 const (
-	OTPPurposeUserRegister   = "user_register"
-	OTPPurposeDriverRegister = "driver_register"
-	OTPPurposeResetPassword  = "reset_password"
+	OTPPurposeUserRegister   = common.OTPPurposeUserRegister
+	OTPPurposeDriverRegister = common.OTPPurposeDriverRegister
+	OTPPurposeResetPassword  = common.OTPPurposeResetPassword
 	OTPLength                = 6
 	OTPMaxAttempt            = 5
 	OTPExpireMinutes         = 5
-	FailureReasonInvalidCode = "invalid_code"
-	FailureReasonMaxAttempt  = "max_attempt"
-	ResultSuccess            = "success"
-	ResultFailed             = "failed"
-	ResultLocked             = "locked"
+	FailureReasonInvalidCode = common.OTPFailureReasonInvalidCode
+	FailureReasonMaxAttempt  = common.OTPFailureReasonMaxAttempt
+	ResultSuccess            = common.OTPResultSuccess
+	ResultFailed             = common.OTPResultFailed
+	ResultLocked             = common.OTPResultLocked
 )
 
 func NewOTPUsecase(
 	otpRepository repository.IOTPRepository,
 	otpAuditRepository repository.IOTPAuditRepository,
-	settingUsecase ISettingUsecase,
+	settingUsecase web_system.ISettingUsecase,
 	notifyUsecase INotifyUsecase,
 	txManager database.TransactionManager,
 ) IOTPUsecase {
@@ -65,31 +69,55 @@ func NewOTPUsecase(
 }
 
 func (u *otpUsecase) CreateOTP(ctx context.Context, target string, purpose string) (string, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("CreateOTP: start", zap.String(global.KeyCorrelationID, cid), zap.String("target", target), zap.String("purpose", purpose))
+
 	purpose = u.defaultPurposeIfEmpty(purpose)
-	return u.createOTPWithPurpose(ctx, target, purpose, nil)
+	code, err := u.createOTPWithPurpose(ctx, target, purpose, nil)
+	if err != nil {
+		global.Logger.Error("CreateOTP: failed to create OTP", zap.String(global.KeyCorrelationID, cid), zap.String("target", target), zap.Error(err))
+		return "", err
+	}
+	global.Logger.Info("CreateOTP: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("target", target))
+	return code, nil
 }
 
 func (u *otpUsecase) CreateForgotPasswordOTP(ctx context.Context, target string) (string, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("CreateForgotPasswordOTP: start", zap.String(global.KeyCorrelationID, cid), zap.String("target", target))
+
 	purpose := OTPPurposeResetPassword
 
 	cfg, err := u.settingUsecase.GetResendConfig(ctx)
 	if err != nil {
+		global.Logger.Error("CreateForgotPasswordOTP: failed to get resend config", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return "", err
 	}
 
 	if err := u.ensureResendCooldown(ctx, target, purpose, cfg); err != nil {
+		global.Logger.Error("CreateForgotPasswordOTP: resend cooldown check failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return "", err
 	}
 	if err := u.ensureResendRateLimit(ctx, target, purpose, cfg); err != nil {
+		global.Logger.Error("CreateForgotPasswordOTP: resend rate limit exceeded", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return "", err
 	}
 
-	return u.createOTPWithPurpose(ctx, target, purpose, cfg)
+	code, err := u.createOTPWithPurpose(ctx, target, purpose, cfg)
+	if err != nil {
+		global.Logger.Error("CreateForgotPasswordOTP: failed to create OTP", zap.String(global.KeyCorrelationID, cid), zap.String("target", target), zap.Error(err))
+		return "", err
+	}
+	global.Logger.Info("CreateForgotPasswordOTP: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("target", target))
+	return code, nil
 }
 
 func (u *otpUsecase) createOTPWithPurpose(ctx context.Context, target string, purpose string, cfg *setting.ResendOTPConfig) (string, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+
 	code := generate.GenerateOTPCode(OTPLength)
 	if err := u.otpRepository.ExpireOldOTPs(ctx); err != nil {
+		global.Logger.Error("createOTPWithPurpose: failed to expire old OTPs", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return "", err
 	}
 
@@ -102,34 +130,43 @@ func (u *otpUsecase) createOTPWithPurpose(ctx context.Context, target string, pu
 		ExpiresAt:  expiresAt,
 	}
 	if err := u.otpRepository.CreateOTP(ctx, input); err != nil {
+		global.Logger.Error("createOTPWithPurpose: failed to create OTP", zap.String(global.KeyCorrelationID, cid), zap.String("target", target), zap.Error(err))
 		return "", err
 	}
 	return code, nil
 }
 
 func (u *otpUsecase) ResendOTP(ctx context.Context, target string, purpose string) (string, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("ResendOTP: start", zap.String(global.KeyCorrelationID, cid), zap.String("target", target), zap.String("purpose", purpose))
+
 	purpose = u.defaultPurposeIfEmpty(purpose)
 
 	cfg, err := u.settingUsecase.GetResendConfig(ctx)
 	if err != nil {
+		global.Logger.Error("ResendOTP: failed to get resend config", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return "", err
 	}
 
 	if purpose != OTPPurposeUserRegister {
 		if err := u.ensureHasPreviousOTP(ctx, target, purpose); err != nil {
+			global.Logger.Error("ResendOTP: no previous OTP to resend", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 			return "", err
 		}
 	}
 
 	if err := u.ensureResendCooldown(ctx, target, purpose, cfg); err != nil {
+		global.Logger.Error("ResendOTP: resend cooldown check failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return "", err
 	}
 	if err := u.ensureResendRateLimit(ctx, target, purpose, cfg); err != nil {
+		global.Logger.Error("ResendOTP: resend rate limit exceeded", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return "", err
 	}
 
 	code, err := u.createOTPWithPurpose(ctx, target, purpose, cfg)
 	if err != nil {
+		global.Logger.Error("ResendOTP: failed to create OTP", zap.String(global.KeyCorrelationID, cid), zap.String("target", target), zap.Error(err))
 		return "", err
 	}
 
@@ -138,11 +175,15 @@ func (u *otpUsecase) ResendOTP(ctx context.Context, target string, purpose strin
 		_ = u.notifyUsecase.SendOtp(ctx, msg)
 	}
 
+	global.Logger.Info("ResendOTP: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("target", target))
 	return code, nil
 }
 
 func (u *otpUsecase) VerifyOTP(ctx context.Context, target string, code string, purpose string, ip string, userAgent string) (bool, error) {
-	return database.WithTransaction(
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("VerifyOTP: start", zap.String(global.KeyCorrelationID, cid), zap.String("target", target), zap.String("purpose", purpose))
+
+	ok, err := database.WithTransaction(
 		u.txManager,
 		ctx,
 		func(txCtx context.Context) (bool, error) {
@@ -162,6 +203,12 @@ func (u *otpUsecase) VerifyOTP(ctx context.Context, target string, code string, 
 			return true, u.handleValidOTP(txCtx, row, attemptNumber, target, purpose, ip, userAgent)
 		},
 	)
+	if err != nil {
+		global.Logger.Error("VerifyOTP: failed to verify OTP", zap.String(global.KeyCorrelationID, cid), zap.String("target", target), zap.Error(err))
+		return false, err
+	}
+	global.Logger.Info("VerifyOTP: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("target", target), zap.Bool("verified", ok))
+	return ok, nil
 }
 
 // Helpers

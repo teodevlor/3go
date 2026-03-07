@@ -3,17 +3,18 @@ package websystem
 import (
 	"encoding/json"
 	"fmt"
-	"go-structure/internal/common"
 	"strings"
 	"time"
+
+	"go-structure/internal/common"
 )
 
 // condition type
 const (
-	ConditionTypeTimeWindow = "time_window"
-	ConditionTypeWeather    = "weather"
-	ConditionTypeTraffic    = "traffic"
-	ConditionTypeHoliday    = "holiday"
+	ConditionTypeTimeWindow = common.ConditionTypeTimeWindow
+	ConditionTypeWeather    = common.ConditionTypeWeather
+	ConditionTypeTraffic    = common.ConditionTypeTraffic
+	ConditionTypeHoliday    = common.ConditionTypeHoliday
 )
 
 type (

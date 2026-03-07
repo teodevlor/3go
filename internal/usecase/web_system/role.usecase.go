@@ -5,17 +5,21 @@ import (
 	"errors"
 	"strings"
 
+	"go-structure/global"
 	"go-structure/internal/constants"
 	dto_common "go-structure/internal/dto/common"
 	dto "go-structure/internal/dto/web_system"
 	"go-structure/internal/helper/database"
+	"go-structure/internal/middleware"
 	pgdb "go-structure/orm/db/postgres"
 	websystem_model "go-structure/internal/repository/model/web_system"
 	websystem_repo "go-structure/internal/repository/web_system"
 	roleTransformer "go-structure/internal/transformer/web_system"
+	"go-structure/pkg/validator"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"go.uber.org/zap"
 )
 
 var (
@@ -35,14 +39,21 @@ type (
 	roleUsecase struct {
 		repo               websystem_repo.IRoleRepository
 		rolePermissionRepo websystem_repo.IRolePermissionRepository
+		permissionRepo     websystem_repo.IPermissionRepository
 		transactionManager database.TransactionManager
 	}
 )
 
-func NewRoleUsecase(repo websystem_repo.IRoleRepository, rolePermissionRepo websystem_repo.IRolePermissionRepository, transactionManager database.TransactionManager) IRoleUsecase {
+func NewRoleUsecase(
+	repo websystem_repo.IRoleRepository,
+	rolePermissionRepo websystem_repo.IRolePermissionRepository,
+	permissionRepo websystem_repo.IPermissionRepository,
+	transactionManager database.TransactionManager,
+) IRoleUsecase {
 	return &roleUsecase{
 		repo:               repo,
 		rolePermissionRepo: rolePermissionRepo,
+		permissionRepo:     permissionRepo,
 		transactionManager: transactionManager,
 	}
 }
@@ -74,12 +85,25 @@ func uuidSliceToStringSlice(uuids []uuid.UUID) []string {
 }
 
 func (u *roleUsecase) Create(ctx context.Context, req *dto.CreateRoleRequestDto) (*dto.RoleItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Create: start", zap.String(global.KeyCorrelationID, cid), zap.String("code", req.Code))
+
 	if u.repo == nil {
 		return nil, nil
 	}
 	permissionIDs, err := parsePermissionIDs(req.PermissionIDs)
 	if err != nil {
+		global.Logger.Error("Create: failed to parse permission IDs", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
+	}
+	if u.permissionRepo != nil {
+		if err := validator.CheckExistsMany(ctx, permissionIDs, func(ctx context.Context, id uuid.UUID) error {
+			_, err := u.permissionRepo.GetByID(ctx, id)
+			return err
+		}, ErrPermissionNotFound); err != nil {
+			global.Logger.Error("Create: failed to validate permissions", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+			return nil, err
+		}
 	}
 	params := pgdb.CreateRoleParams{
 		Code:        req.Code,
@@ -110,21 +134,29 @@ func (u *roleUsecase) Create(ctx context.Context, req *dto.CreateRoleRequestDto)
 		},
 	)
 	if err != nil {
+		global.Logger.Error("Create: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("Create: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("role_id", role.ID.String()))
 	item := roleTransformer.ToRoleItemDto(role, req.PermissionIDs)
 	return &item, nil
 }
 
 func (u *roleUsecase) GetByID(ctx context.Context, id uuid.UUID) (*dto.RoleItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("GetByID: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.repo == nil {
+		global.Logger.Error("GetByID: repository nil", zap.String(global.KeyCorrelationID, cid))
 		return nil, ErrRoleNotFound
 	}
 	role, err := u.repo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			global.Logger.Error("GetByID: role not found", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 			return nil, ErrRoleNotFound
 		}
+		global.Logger.Error("GetByID: failed to get role", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	var permIDStrs []string
@@ -132,11 +164,14 @@ func (u *roleUsecase) GetByID(ctx context.Context, id uuid.UUID) (*dto.RoleItemD
 		permIDs, _ := u.rolePermissionRepo.GetPermissionIDsByRoleID(ctx, id)
 		permIDStrs = uuidSliceToStringSlice(permIDs)
 	}
+	global.Logger.Info("GetByID: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	item := roleTransformer.ToRoleItemDto(role, permIDStrs)
 	return &item, nil
 }
 
 func (u *roleUsecase) List(ctx context.Context, page, limit int, search string) (*dto.ListRolesResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("List: start", zap.String(global.KeyCorrelationID, cid), zap.Int("page", page), zap.Int("limit", limit))
 	if u.repo == nil {
 		return &dto.ListRolesResponseDto{
 			Items: nil,
@@ -162,10 +197,12 @@ func (u *roleUsecase) List(ctx context.Context, page, limit int, search string) 
 
 	total, err := u.repo.Count(ctx, search)
 	if err != nil {
+		global.Logger.Error("List: failed to count roles", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	roles, err := u.repo.List(ctx, search, limit32, offset)
 	if err != nil {
+		global.Logger.Error("List: failed to list roles", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	roleIDs := make([]uuid.UUID, 0, len(roles))
@@ -176,18 +213,33 @@ func (u *roleUsecase) List(ctx context.Context, page, limit int, search string) 
 	if u.rolePermissionRepo != nil && len(roleIDs) > 0 {
 		permMap, _ = u.rolePermissionRepo.GetPermissionIDsByRoleIDs(ctx, roleIDs)
 	}
+	global.Logger.Info("List: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.Int64("total", total))
 	res := roleTransformer.ToListRolesResponseDto(roles, permMap, page, limit, total)
 	return &res, nil
 }
 
 func (u *roleUsecase) Update(ctx context.Context, id uuid.UUID, req *dto.UpdateRoleRequestDto) (*dto.RoleItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Update: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.repo == nil {
+		global.Logger.Error("Update: repository nil", zap.String(global.KeyCorrelationID, cid))
 		return nil, ErrRoleNotFound
 	}
 	permIDs := *req.PermissionIDs
 	permissionIDs, err := parsePermissionIDs(permIDs)
 	if err != nil {
+		global.Logger.Error("Update: failed to parse permission IDs", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
+	}
+	if u.permissionRepo != nil {
+		if err := validator.CheckExistsMany(ctx, permissionIDs, func(ctx context.Context, id uuid.UUID) error {
+			_, err := u.permissionRepo.GetByID(ctx, id)
+			return err
+		}, ErrPermissionNotFound); err != nil {
+			global.Logger.Error("Update: failed to validate permissions", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+			return nil, err
+		}
 	}
 	params := pgdb.UpdateRoleParams{
 		ID:          id,
@@ -229,14 +281,20 @@ func (u *roleUsecase) Update(ctx context.Context, id uuid.UUID, req *dto.UpdateR
 		},
 	)
 	if err != nil {
+		global.Logger.Error("Update: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("Update: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	item := roleTransformer.ToRoleItemDto(role, permIDs)
 	return &item, nil
 }
 
 func (u *roleUsecase) Delete(ctx context.Context, id uuid.UUID) error {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Delete: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.repo == nil {
+		global.Logger.Error("Delete: repository nil", zap.String(global.KeyCorrelationID, cid))
 		return ErrRoleNotFound
 	}
 	_, err := database.WithTransaction(
@@ -246,5 +304,10 @@ func (u *roleUsecase) Delete(ctx context.Context, id uuid.UUID) error {
 			return struct{}{}, u.repo.Delete(txCtx, id)
 		},
 	)
-	return err
+	if err != nil {
+		global.Logger.Error("Delete: failed to delete role", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+		return err
+	}
+	global.Logger.Info("Delete: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+	return nil
 }

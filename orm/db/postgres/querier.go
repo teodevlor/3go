@@ -15,7 +15,7 @@ type Querier interface {
 	CountAccounts(ctx context.Context) (int64, error)
 	CountDriverDocumentTypes(ctx context.Context, dollar_1 interface{}) (int64, error)
 	CountDriverDocumentTypesByServiceID(ctx context.Context, arg CountDriverDocumentTypesByServiceIDParams) (int64, error)
-	CountDriverProfiles(ctx context.Context, dollar_1 interface{}) (int64, error)
+	CountDriverProfiles(ctx context.Context, arg CountDriverProfilesParams) (int64, error)
 	CountOTPsCreatedSince(ctx context.Context, arg CountOTPsCreatedSinceParams) (int32, error)
 	CountPermissions(ctx context.Context, dollar_1 string) (int64, error)
 	CountRoles(ctx context.Context, dollar_1 string) (int64, error)
@@ -133,7 +133,7 @@ type Querier interface {
 	ListDriverProfiles(ctx context.Context, arg ListDriverProfilesParams) ([]DriverProfile, error)
 	ListPackageSizePricings(ctx context.Context, serviceID pgtype.UUID) ([]SystemPackageSizePricing, error)
 	ListPermissions(ctx context.Context, arg ListPermissionsParams) ([]SystemPermission, error)
-	// Trả về document types áp dụng cho service: theo service_id HOẶC chung (service_id IS NULL).
+	// Trả về document types áp dụng cho service: theo service_id HOẶC chung (service_id IS NULL), chỉ lấy bản ghi đang active.
 	ListRequiredDriverDocumentTypesByServiceID(ctx context.Context, serviceID *uuid.UUID) ([]DriverDocumentType, error)
 	ListRoles(ctx context.Context, arg ListRolesParams) ([]SystemRole, error)
 	ListServiceZonesByServiceID(ctx context.Context, serviceID uuid.UUID) ([]SystemServiceZone, error)

@@ -4,20 +4,23 @@ import (
 	"context"
 	"errors"
 
+	"go-structure/global"
 	common "go-structure/internal/common"
 	dto_common "go-structure/internal/dto/common"
 	dto "go-structure/internal/dto/web_system"
 	"go-structure/internal/helper/database"
 	"go-structure/internal/helper/parse"
-	pgdb "go-structure/orm/db/postgres"
+	"go-structure/internal/middleware"
 	account_repo "go-structure/internal/repository"
 	"go-structure/internal/repository/model"
 	websystem_model "go-structure/internal/repository/model/web_system"
 	websystem_repo "go-structure/internal/repository/web_system"
 	serviceTransformer "go-structure/internal/transformer/web_system"
+	pgdb "go-structure/orm/db/postgres"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"go.uber.org/zap"
 )
 
 var ErrSurchargeRuleNotFound = errors.New("không tìm thấy quy tắc phụ thu")
@@ -60,18 +63,24 @@ func NewSurchargeRuleUsecase(
 }
 
 func (u *surchargeRuleUsecase) Create(ctx context.Context, adminID uuid.UUID, req *dto.CreateSurchargeRuleRequestDto) (*dto.SurchargeRuleItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Create: start", zap.String(global.KeyCorrelationID, cid), zap.String("service_id", req.ServiceID), zap.String("zone_id", req.ZoneID))
+
 	if u.repo == nil {
 		return nil, nil
 	}
 	serviceID, err := uuid.Parse(req.ServiceID)
 	if err != nil {
+		global.Logger.Error("Create: failed to parse service_id", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	zoneID, err := uuid.Parse(req.ZoneID)
 	if err != nil {
+		global.Logger.Error("Create: failed to parse zone_id", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	if err := u.validateConditionIDs(ctx, req.ConditionIDs); err != nil {
+		global.Logger.Error("Create: failed to validate condition IDs", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	ruleToValidate := &websystem_model.SurchargeRule{
@@ -80,6 +89,7 @@ func (u *surchargeRuleUsecase) Create(ctx context.Context, adminID uuid.UUID, re
 		Priority: int32(req.Priority),
 	}
 	if err := ruleToValidate.ValidateSurchargeRule(); err != nil {
+		global.Logger.Error("Create: rule validation failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	params := pgdb.CreateSurchargeRuleParams{
@@ -134,54 +144,71 @@ func (u *surchargeRuleUsecase) Create(ctx context.Context, adminID uuid.UUID, re
 		},
 	)
 	if err != nil {
+		global.Logger.Error("Create: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 
 	item, err := u.enrichRuleWithConditions(ctx, rule)
 	if err != nil {
+		global.Logger.Error("Create: failed to enrich rule with conditions", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 
+	global.Logger.Info("Create: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("rule_id", rule.ID.String()))
 	return item, nil
 }
 
 func (u *surchargeRuleUsecase) GetByID(ctx context.Context, id uuid.UUID) (*dto.SurchargeRuleItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("GetByID: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.repo == nil {
+		global.Logger.Error("GetByID: repository nil", zap.String(global.KeyCorrelationID, cid))
 		return nil, ErrSurchargeRuleNotFound
 	}
 	rule, err := u.repo.GetByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
+			global.Logger.Error("GetByID: rule not found", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 			return nil, ErrSurchargeRuleNotFound
 		}
+		global.Logger.Error("GetByID: failed to get rule", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	item, err := u.enrichRuleWithConditions(ctx, rule)
 	if err != nil {
+		global.Logger.Error("GetByID: failed to enrich rule", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("GetByID: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	return item, nil
 }
 
 func (u *surchargeRuleUsecase) List(ctx context.Context, serviceID, zoneID *uuid.UUID) (*dto.ListSurchargeRulesResponseDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("List: start", zap.String(global.KeyCorrelationID, cid))
+
 	if u.repo == nil {
 		return &dto.ListSurchargeRulesResponseDto{
-			Items:      nil,
+			Items:      []dto.SurchargeRuleItemDto{},
 			Pagination: dto_common.PaginationMeta{Page: 1, Limit: 0, Total: 0},
 		}, nil
 	}
 	rules, err := u.repo.List(ctx, serviceID, zoneID)
 	if err != nil {
+		global.Logger.Error("List: failed to list rules", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	items := make([]dto.SurchargeRuleItemDto, 0, len(rules))
 	for _, r := range rules {
 		item, err := u.enrichRuleWithConditions(ctx, r)
 		if err != nil {
+			global.Logger.Error("List: failed to enrich rule", zap.String(global.KeyCorrelationID, cid), zap.String("rule_id", r.ID.String()), zap.Error(err))
 			return nil, err
 		}
 		items = append(items, *item)
 	}
+	global.Logger.Info("List: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.Int("count", len(items)))
 	return &dto.ListSurchargeRulesResponseDto{
 		Items: items,
 		Pagination: dto_common.PaginationMeta{
@@ -193,27 +220,34 @@ func (u *surchargeRuleUsecase) List(ctx context.Context, serviceID, zoneID *uuid
 }
 
 func (u *surchargeRuleUsecase) Update(ctx context.Context, adminID uuid.UUID, id uuid.UUID, req *dto.UpdateSurchargeRuleRequestDto) (*dto.SurchargeRuleItemDto, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Update: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.repo == nil {
+		global.Logger.Error("Update: repository nil", zap.String(global.KeyCorrelationID, cid))
 		return nil, ErrSurchargeRuleNotFound
 	}
 	serviceID, err := uuid.Parse(req.ServiceID)
 	if err != nil {
+		global.Logger.Error("Update: failed to parse service_id", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	zoneID, err := uuid.Parse(req.ZoneID)
 	if err != nil {
+		global.Logger.Error("Update: failed to parse zone_id", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	if err := u.validateConditionIDs(ctx, req.ConditionIDs); err != nil {
+		global.Logger.Error("Update: failed to validate condition IDs", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
-	// Entity business rule: validate trước khi persist (Clean Architecture)
 	ruleToValidate := &websystem_model.SurchargeRule{
 		Amount:   req.Amount,
 		Unit:     req.Unit,
 		Priority: int32(req.Priority),
 	}
 	if err := ruleToValidate.ValidateSurchargeRule(); err != nil {
+		global.Logger.Error("Update: rule validation failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	params := pgdb.UpdateSurchargeRuleParams{
@@ -256,7 +290,6 @@ func (u *surchargeRuleUsecase) Update(ctx context.Context, adminID uuid.UUID, id
 				return nil, err
 			}
 
-			// reset & re-add conditions in pivot
 			if u.conditionRepo != nil {
 				if err := u.conditionRepo.DeleteBySurchargeID(txCtx, id); err != nil {
 					return nil, err
@@ -276,20 +309,32 @@ func (u *surchargeRuleUsecase) Update(ctx context.Context, adminID uuid.UUID, id
 		},
 	)
 	if err != nil {
+		global.Logger.Error("Update: transaction failed", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
 	item, err := u.enrichRuleWithConditions(ctx, rule)
 	if err != nil {
+		global.Logger.Error("Update: failed to enrich rule", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
 		return nil, err
 	}
+	global.Logger.Info("Update: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
 	return item, nil
 }
 
 func (u *surchargeRuleUsecase) Delete(ctx context.Context, id uuid.UUID) error {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("Delete: start", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+
 	if u.repo == nil {
+		global.Logger.Error("Delete: repository nil", zap.String(global.KeyCorrelationID, cid))
 		return ErrSurchargeRuleNotFound
 	}
-	return u.repo.Delete(ctx, id)
+	if err := u.repo.Delete(ctx, id); err != nil {
+		global.Logger.Error("Delete: failed to delete rule", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+		return err
+	}
+	global.Logger.Info("Delete: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("id", id.String()))
+	return nil
 }
 
 func (u *surchargeRuleUsecase) validateConditionIDs(ctx context.Context, conditionIDs []string) error {

@@ -36,13 +36,15 @@ RETURNING *;
 SELECT * FROM driver_profiles
 WHERE deleted_at IS NULL
   AND ($1 = '' OR full_name ILIKE '%' || $1 || '%')
+  AND ($2 = '' OR global_status = $2::driver_profile_status)
 ORDER BY created_at DESC
-LIMIT $2 OFFSET $3;
+LIMIT $3 OFFSET $4;
 
 -- name: CountDriverProfiles :one
 SELECT COUNT(*) FROM driver_profiles
 WHERE deleted_at IS NULL
-  AND ($1 = '' OR full_name ILIKE '%' || $1 || '%');
+  AND ($1 = '' OR full_name ILIKE '%' || $1 || '%')
+  AND ($2 = '' OR global_status = $2::driver_profile_status);
 
 -- name: DeleteDriverProfile :exec
 UPDATE driver_profiles

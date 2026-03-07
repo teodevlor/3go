@@ -4,8 +4,12 @@ import (
 	"context"
 	"encoding/json"
 
+	"go-structure/global"
 	settingRepository "go-structure/internal/repository/web_system"
 	"go-structure/internal/setting"
+	"go-structure/internal/middleware"
+
+	"go.uber.org/zap"
 )
 
 const (
@@ -42,14 +46,21 @@ func defaultResendConfig() *setting.ResendOTPConfig {
 }
 
 func (u *settingUsecase) GetResendConfig(ctx context.Context) (*setting.ResendOTPConfig, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("GetResendConfig: start", zap.String(global.KeyCorrelationID, cid))
+
 	raw := u.GetSettingValueByKey(ctx, SettingKeyResendOTP)
 	if len(raw) == 0 {
+		global.Logger.Info("GetResendConfig: completed successfully (using default)", zap.String(global.KeyCorrelationID, cid))
 		return defaultResendConfig(), nil
 	}
 	var cfg setting.ResendOTPConfig
 	if err := json.Unmarshal(raw, &cfg); err != nil {
+		global.Logger.Error("GetResendConfig: failed to unmarshal config", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+		global.Logger.Info("GetResendConfig: completed (using default due to parse error)", zap.String(global.KeyCorrelationID, cid))
 		return defaultResendConfig(), nil
 	}
+	global.Logger.Info("GetResendConfig: completed successfully", zap.String(global.KeyCorrelationID, cid))
 	return &cfg, nil
 }
 

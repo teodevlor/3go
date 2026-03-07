@@ -3,10 +3,13 @@ package web_system
 import (
 	"context"
 
+	"go-structure/global"
 	"go-structure/internal/helper/database"
+	"go-structure/internal/middleware"
 	websystem_repo "go-structure/internal/repository/web_system"
 
 	"github.com/google/uuid"
+	"go.uber.org/zap"
 )
 
 type (
@@ -39,6 +42,9 @@ func (u *serviceZoneUsecase) setZonesForServiceInTx(ctx context.Context, service
 }
 
 func (u *serviceZoneUsecase) SetZonesForService(ctx context.Context, serviceID uuid.UUID, zoneIDs []uuid.UUID) error {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("SetZonesForService: start", zap.String(global.KeyCorrelationID, cid), zap.String("service_id", serviceID.String()), zap.Int("zone_count", len(zoneIDs)))
+
 	if u.serviceZoneRepo == nil {
 		return nil
 	}
@@ -52,12 +58,26 @@ func (u *serviceZoneUsecase) SetZonesForService(ctx context.Context, serviceID u
 			return struct{}{}, u.setZonesForServiceInTx(txCtx, serviceID, zoneIDs)
 		},
 	)
-	return err
+	if err != nil {
+		global.Logger.Error("SetZonesForService: failed to set zones", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+		return err
+	}
+	global.Logger.Info("SetZonesForService: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.String("service_id", serviceID.String()))
+	return nil
 }
 
 func (u *serviceZoneUsecase) GetZoneIDsByServiceID(ctx context.Context, serviceID uuid.UUID) ([]uuid.UUID, error) {
+	cid := middleware.CorrelationIDFromContext(ctx)
+	global.Logger.Info("GetZoneIDsByServiceID: start", zap.String(global.KeyCorrelationID, cid), zap.String("service_id", serviceID.String()))
+
 	if u.serviceZoneRepo == nil {
 		return nil, nil
 	}
-	return u.serviceZoneRepo.ListServiceZoneIDsByServiceID(ctx, serviceID)
+	ids, err := u.serviceZoneRepo.ListServiceZoneIDsByServiceID(ctx, serviceID)
+	if err != nil {
+		global.Logger.Error("GetZoneIDsByServiceID: failed to list zone IDs", zap.String(global.KeyCorrelationID, cid), zap.Error(err))
+		return nil, err
+	}
+	global.Logger.Info("GetZoneIDsByServiceID: completed successfully", zap.String(global.KeyCorrelationID, cid), zap.Int("count", len(ids)))
+	return ids, nil
 }
