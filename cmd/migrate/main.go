@@ -26,9 +26,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := goose.Up(db, "orm/postgres/migrations"); err != nil {
-		log.Fatal(err)
-	}
+	isSeed := len(os.Args) > 1 && os.Args[1] == "seed"
 
-	fmt.Println("Migration completed successfully")
+	if isSeed {
+		goose.SetTableName("goose_db_version_seeds")
+		if err := goose.Up(db, "orm/postgres/migrations/seeds"); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("Seed completed successfully")
+	} else {
+		if err := goose.Up(db, "orm/postgres/migrations"); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("Migration completed successfully")
+	}
 }
