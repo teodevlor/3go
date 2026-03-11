@@ -69,7 +69,6 @@ networks:
   gogogo_net:
     driver: overlay
     attachable: true
-
 configs:
   gogogo_config:
     external: true

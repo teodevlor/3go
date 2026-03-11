@@ -1,0 +1,126 @@
+version: "3.9" # version của docker compose syntax dùng cho swarm stack
+
+services: # danh sách các service sẽ chạy trong swarm
+
+  loki: # service lưu trữ log
+    image: grafana/loki:2.9.4 # image của :contentReference[oaicite:1]{index=1}
+
+    command: -config.file=/etc/loki/loki-config.yml 
+    # chạy loki và chỉ định file config
+
+    ports:
+      - "3100:3100"
+      # expose port 3100 ra host
+      # grafana hoặc client sẽ gọi tới http://host:3100
+
+    volumes:
+      - loki_data:/loki
+      # mount volume persistent
+      # loki lưu log vào /loki
+      # nếu container restart log không bị mất
+
+    configs:
+      - source: loki_config
+        target: /etc/loki/loki-config.yml
+      # docker config của swarm
+      # inject file loki-config.yml vào container
+
+    networks:
+      - observability
+      # attach vào overlay network
+      # các service khác (promtail, grafana) có thể gọi "loki"
+
+    deploy:
+      replicas: 1
+      # chỉ chạy 1 instance loki
+
+      placement:
+        constraints:
+          - node.role == manager
+      # ép loki chạy trên manager node
+      # tránh worker node bị mất log storage
+      
+
+  promtail: # agent đọc log và gửi tới loki
+    image: grafana/promtail:2.9.4 # image của :contentReference[oaicite:2]{index=2}
+
+    command: -config.file=/etc/promtail/promtail-config.yml
+    # chỉ định file config
+
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      # mount thư mục docker logs
+      # promtail sẽ đọc file *.log của container
+
+      - /var/log:/var/log
+      # đọc system logs nếu cần
+
+      - /var/run/docker.sock:/var/run/docker.sock
+      # cho promtail đọc metadata docker container
+      # ví dụ container name, labels
+
+    configs:
+      - source: promtail_config
+        target: /etc/promtail/promtail-config.yml
+      # inject config promtail vào container
+
+    networks:
+      - observability
+      # cùng network với loki
+
+    deploy:
+      mode: global
+      # cực kỳ quan trọng
+      # chạy 1 promtail trên mỗi node trong swarm
+      # để mỗi node tự đọc log container của nó
+
+
+  grafana: # UI để xem log
+    image: grafana/grafana:latest # image của :contentReference[oaicite:3]{index=3}
+
+    ports:
+      - "3000:3000"
+      # expose grafana ra ngoài
+      # truy cập: http://server:3000
+
+    volumes:
+      - grafana_data:/var/lib/grafana
+      # lưu dashboards và datasource
+      # restart container vẫn giữ cấu hình
+
+    networks:
+      - observability
+      # grafana sẽ gọi loki qua network này
+
+    deploy:
+      replicas: 1
+      # chỉ cần 1 grafana instance
+
+
+configs: # docker config của swarm
+
+  loki_config:
+    file: ./loki-config.yml
+    # file config loki nằm trên host
+    # swarm sẽ distribute tới container
+
+  promtail_config:
+    file: ./promtail-config.yml
+    # file config promtail
+
+
+volumes: # persistent volumes
+
+  loki_data:
+  # nơi loki lưu log
+
+  grafana_data:
+  # nơi grafana lưu dashboards
+
+
+networks: # network cho stack
+
+  observability:
+    driver: overlay
+    # overlay network cho swarm
+    # cho phép container trên nhiều node giao tiếp với nhau

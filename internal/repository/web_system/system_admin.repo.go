@@ -2,14 +2,16 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"go-structure/internal/helper/database"
 	"go-structure/internal/mapper"
-	pgdb "go-structure/orm/db/postgres"
 	"go-structure/internal/repository/model"
+	pgdb "go-structure/orm/db/postgres"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -43,6 +45,9 @@ func (r *systemAdminRepository) GetByEmail(ctx context.Context, email string) (*
 	db := r.getDB(ctx)
 	row, err := db.GetSystemAdminByEmail(ctx, email)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return mapper.ToSystemAdmin(row), nil
@@ -52,6 +57,9 @@ func (r *systemAdminRepository) GetByID(ctx context.Context, id uuid.UUID) (*mod
 	db := r.getDB(ctx)
 	row, err := db.GetSystemAdminByID(ctx, id)
 	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return mapper.ToSystemAdmin(row), nil
