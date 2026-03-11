@@ -103,7 +103,7 @@ pipeline {
                     }
                 }
 
-                stage('Run migrations and seeds') {
+               stage('Run migrations and seeds') {
                     steps {
                         withCredentials([string(
                             credentialsId: 'prod-postgres-dsn',
@@ -111,7 +111,12 @@ pipeline {
                         )]) {
 
                             sh """
-                                set -e
+                                set -ex
+
+                                echo "=============================="
+                                echo "DEBUG DATABASE CONNECTION"
+                                echo "POSTGRES_DSN=\$POSTGRES_DSN"
+                                echo "=============================="
 
                                 echo "Running migrations..."
 
